@@ -206,7 +206,9 @@ class QRangeSlider(QSlider):
         return self._style.brush_active
 
     def _setBarColor(self, color):
-        self._style.brush_active = color
+        from ._style import parse_color
+
+        self._style.brush_active = parse_color(color)
 
     barColor = Property(str, _getBarColor, _setBarColor)
 
