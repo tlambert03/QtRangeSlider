@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Union
 
+from .qtcompat import PYQT_VERSION
 from .qtcompat.QtCore import Qt
 from .qtcompat.QtGui import (
     QColor,
@@ -118,6 +119,9 @@ CATALINA_STYLE = replace(
     tick_bar_alpha=0.3,
     tick_offset=4,
 )
+
+if PYQT_VERSION and int(PYQT_VERSION.split(".", maxsplit=1)[0]) == 6:
+    CATALINA_STYLE = replace(CATALINA_STYLE, tick_offset=2)
 
 BIG_SUR_STYLE = replace(
     CATALINA_STYLE,
