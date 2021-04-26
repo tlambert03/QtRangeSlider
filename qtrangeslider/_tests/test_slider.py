@@ -10,12 +10,12 @@ def test_basic(qtbot, orientation):
     qtbot.addWidget(rs)
 
 
-def test_drag_handles(qtbot, qapp):
+def test_drag_handles(qtbot):
     rs = QRangeSlider(Qt.Horizontal)
+    qtbot.addWidget(rs)
     rs.setRange(0, 99)
     rs.setValue((20, 80))
     rs.setMouseTracking(True)
-    qtbot.addWidget(rs)
     rs.show()
 
     # press the left handle

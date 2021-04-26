@@ -77,9 +77,9 @@ class RangeSliderStyle:
                 off += self.h_offset or SYSTEM_STYLE.h_offset or 0
             else:
                 off += self.v_offset or SYSTEM_STYLE.v_offset or 0
-            if tp & QSlider.TicksAbove:
+            if tp == QSlider.TicksAbove:
                 off += self.tick_offset or SYSTEM_STYLE.tick_offset
-            elif tp & QSlider.TicksBelow:
+            elif tp == QSlider.TicksBelow:
                 off -= self.tick_offset or SYSTEM_STYLE.tick_offset
         return off
 
