@@ -120,7 +120,7 @@ CATALINA_STYLE = replace(
     tick_offset=4,
 )
 
-if PYQT_VERSION and int(PYQT_VERSION.split(".", maxsplit=1)[0]) == 6:
+if PYQT_VERSION and int(PYQT_VERSION.split(".")[0]) == 6:
     CATALINA_STYLE = replace(CATALINA_STYLE, tick_offset=2)
 
 BIG_SUR_STYLE = replace(
@@ -134,6 +134,9 @@ BIG_SUR_STYLE = replace(
     h_offset=-2,
     tick_bar_alpha=0.2,
 )
+
+if PYQT_VERSION and int(PYQT_VERSION.split(".")[0]) == 6:
+    BIG_SUR_STYLE = replace(BIG_SUR_STYLE, tick_offset=-3)
 
 WINDOWS_STYLE = replace(
     BASE_STYLE,
