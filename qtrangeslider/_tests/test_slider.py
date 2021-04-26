@@ -1,7 +1,11 @@
+import os
+
 import pytest
 
 from qtrangeslider import QRangeSlider
 from qtrangeslider.qtcompat.QtCore import Qt
+
+WINDOWS = os.name == "nt"
 
 
 @pytest.mark.parametrize("orientation", ["Horizontal", "Vertical"])
@@ -10,6 +14,7 @@ def test_basic(qtbot, orientation):
     qtbot.addWidget(rs)
 
 
+@pytest.mark.skipif(WINDOWS, reason="QTest.mouseMove not working on windows")
 def test_drag_handles(qtbot):
     rs = QRangeSlider(Qt.Horizontal)
     qtbot.addWidget(rs)
