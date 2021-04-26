@@ -265,7 +265,6 @@ class QRangeSlider(QSlider):
         return super().event(ev)
 
     def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
-        print("mousePressEvent")
         if self.minimum() == self.maximum() or ev.buttons() ^ ev.button():
             ev.ignore()
             return
@@ -304,7 +303,6 @@ class QRangeSlider(QSlider):
 
     def mouseMoveEvent(self, ev: QtGui.QMouseEvent) -> None:
         # TODO: add pixelMetric(QStyle::PM_MaximumDragDistance, &opt, this);
-        print("mouseMoveEvent")
         if self._pressedControl[0] == "handle":
             ev.accept()
             new = self._pixelPosToRangeValue(self._pick(ev.pos()) - self._clickOffset)

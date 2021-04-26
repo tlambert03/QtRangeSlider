@@ -10,35 +10,48 @@ def test_basic(qtbot, orientation):
     qtbot.addWidget(rs)
 
 
-def test_drag(qtbot, qapp):
+def test_drag_handles(qtbot, qapp):
     rs = QRangeSlider(Qt.Horizontal)
+    rs.setRange(0, 99)
+    rs.setValue((20, 80))
     rs.setMouseTracking(True)
     qtbot.addWidget(rs)
     rs.show()
-    rs.sliderMoved.connect(lambda e: print("moved", e))
 
+    # press the left handle
     opt = rs._getStyleOption()
     pos = rs._handleRects(opt, 0).center()
-    qtbot.mousePress(rs, Qt.LeftButton, pos=pos)
+    with qtbot.waitSignal(rs.sliderPressed):
+        qtbot.mousePress(rs, Qt.LeftButton, pos=pos)
     assert rs._pressedControl == ("handle", 0)
 
-    for _ in range(15):
-        pos.setX(pos.x() + 2)
-        qtbot.mouseMove(rs.window(), pos)
-    qtbot.mouseRelease(rs, Qt.LeftButton)
+    # drag the left handle
+    with qtbot.waitSignals([rs.sliderMoved] * 14):
+        for _ in range(15):
+            pos.setX(pos.x() + 2)
+            qtbot.mouseMove(rs.window(), pos)
 
-    assert rs.value() == (35, 80)
+    with qtbot.waitSignal(rs.sliderReleased):
+        qtbot.mouseRelease(rs, Qt.LeftButton)
+
+    # check the values
+    assert rs.value()[0] > 30
     assert rs._pressedControl == rs._NULL_CTRL
 
-    opt = rs._getStyleOption()
+    # press the right handle
     pos = rs._handleRects(opt, 1).center()
-    qtbot.mousePress(rs, Qt.LeftButton, pos=pos)
+    with qtbot.waitSignal(rs.sliderPressed):
+        qtbot.mousePress(rs, Qt.LeftButton, pos=pos)
     assert rs._pressedControl == ("handle", 1)
 
-    for _ in range(15):
-        pos.setX(pos.x() - 2)
-        qtbot.mouseMove(rs.window(), pos)
-    qtbot.mouseRelease(rs, Qt.LeftButton)
+    # drag the right handle
+    with qtbot.waitSignals([rs.sliderMoved] * 14):
+        for _ in range(15):
+            pos.setX(pos.x() - 2)
+            qtbot.mouseMove(rs.window(), pos)
+    with qtbot.waitSignal(rs.sliderReleased):
+        qtbot.mouseRelease(rs, Qt.LeftButton)
 
-    assert rs.value() == (35, 65)
+    # check the values
+    assert rs.value()[1] < 70
     assert rs._pressedControl == rs._NULL_CTRL
