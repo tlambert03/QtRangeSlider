@@ -129,7 +129,6 @@ class QLabeledRangeSlider(QAbstractSlider):
                 lbl.hide()
             else:
                 lbl.show()
-                pass
         self.setOrientation(self.orientation())
 
     def edgeLabelMode(self) -> EdgeLabelMode:
