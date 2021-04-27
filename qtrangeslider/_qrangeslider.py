@@ -350,8 +350,13 @@ class QRangeSlider(QSlider):
         super().setRange(min, max)
         self.setValue(self._value)  # re-bound
 
-    def _handleRects(self, opt: QStyleOptionSlider, handle_index: int = None) -> QRect:
+    def _handleRects(
+        self, opt: QStyleOptionSlider = None, handle_index: int = None
+    ) -> QRect:
         """Return the QRect for all handles."""
+        if opt is None:
+            opt = self._getStyleOption()
+
         style = self.style().proxy()
 
         if handle_index is not None:  # get specific handle rect
