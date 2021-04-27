@@ -1,11 +1,12 @@
-from enum import Enum
+from enum import IntEnum
 from functools import partial
 
 from ._qrangeslider import QRangeSlider
-from .qtcompat.QtCore import QEnum, QPoint, QSize, Qt, Signal
+from .qtcompat.QtCore import QPoint, QSize, Qt, Signal
 from .qtcompat.QtGui import QFontMetrics
 from .qtcompat.QtWidgets import (
     QAbstractSlider,
+    QApplication,
     QHBoxLayout,
     QSlider,
     QSpinBox,
@@ -16,12 +17,18 @@ from .qtcompat.QtWidgets import (
 )
 
 
-class LabelPosition(Enum):
+class LabelPosition(IntEnum):
     NoLabel = 0
     LabelsAbove = 1
     LabelsBelow = 2
     LabelsRight = 1
     LabelsLeft = 2
+
+
+class EdgeLabelMode(IntEnum):
+    NoLabel = 0
+    LabelIsRange = 1
+    LabelIsValue = 2
 
 
 class QLabeledSlider(QAbstractSlider):
@@ -39,17 +46,13 @@ class QLabeledSlider(QAbstractSlider):
         super().__init__(parent)
 
         self._slider = QSlider()
-        self._label = QSpinBox()
-        self._label.setButtonSymbols(QSpinBox.NoButtons)
-        self._label.setStyleSheet("background:transparent; border: 0;")
+        self._label = SliderLabel(self._slider, connect=self.setValue)
 
-        self.valueChanged.connect(self._slider.setValue)
         self.valueChanged.connect(self._label.setValue)
+        self.valueChanged.connect(self._slider.setValue)
         self.rangeChanged.connect(self._slider.setRange)
-        self.rangeChanged.connect(self._label.setRange)
 
         self._slider.valueChanged.connect(self.setValue)
-        self._label.editingFinished.connect(lambda: self.setValue(self._label.value()))
         self.setOrientation(orientation)
 
     def setOrientation(self, orientation):
@@ -78,8 +81,8 @@ class QLabeledSlider(QAbstractSlider):
 
 class QLabeledRangeSlider(QAbstractSlider):
     valueChanged = Signal(tuple)
-
-    LabelPosition = QEnum(LabelPosition)
+    LabelPosition = LabelPosition
+    EdgeLabelMode = EdgeLabelMode
 
     def __init__(self, *args) -> None:
         parent = None
@@ -95,8 +98,7 @@ class QLabeledRangeSlider(QAbstractSlider):
         super().__init__(parent)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self._handle_labels = []
-        self._label_position = self.LabelPosition.LabelsAbove
-        self._edges_show_range = False
+        self._handle_label_position: LabelPosition = LabelPosition.LabelsAbove
 
         self._slider = QRangeSlider()
         self._min_label = SliderLabel(
@@ -105,6 +107,7 @@ class QLabeledRangeSlider(QAbstractSlider):
         self._max_label = SliderLabel(
             self._slider, alignment=Qt.AlignRight, connect=self._max_label_edited
         )
+        self.setEdgeLabelMode(EdgeLabelMode.LabelIsRange)
 
         self._slider.valueChanged.connect(self._on_value_changed)
         self.rangeChanged.connect(self._on_range_changed)
@@ -113,18 +116,53 @@ class QLabeledRangeSlider(QAbstractSlider):
         self._on_range_changed(self._slider.minimum(), self._slider.maximum())
         self.setOrientation(orientation)
 
+    def handleLabelPosition(self) -> LabelPosition:
+        return self._handle_label_position
+
+    def setHandleLabelPosition(self, opt: LabelPosition) -> LabelPosition:
+        self._handle_label_position = opt
+        for lbl in self._handle_labels:
+            if not opt:
+                lbl.hide()
+            else:
+                lbl.show()
+        self.setOrientation(self.orientation())
+
+    def edgeLabelMode(self) -> EdgeLabelMode:
+        return self._edge_label_mode
+
+    def setEdgeLabelMode(self, opt: EdgeLabelMode):
+        self._edge_label_mode = opt
+        if not self._edge_label_mode:
+            self._min_label.hide()
+            self._max_label.hide()
+        else:
+            self._min_label.show()
+            self._max_label.show()
+            self._min_label.setMode(opt)
+            self._max_label.setMode(opt)
+        if opt == EdgeLabelMode.LabelIsValue:
+            v0, *_, v1 = self._slider.value()
+            self._min_label.setValue(v0)
+            self._max_label.setValue(v1)
+        elif opt == EdgeLabelMode.LabelIsRange:
+            self._min_label.setValue(self._slider.minimum())
+            self._max_label.setValue(self._slider.maximum())
+        QApplication.processEvents()
+        self._reposition_labels()
+
     def _reposition_labels(self):
         if not self._handle_labels:
             return
         handle_rect = self._slider._handleRects(None, 0)
         label = self._handle_labels[0]
         if self.orientation() == Qt.Horizontal:
-            if self._label_position == self.LabelPosition.LabelsBelow:
+            if self._handle_label_position == LabelPosition.LabelsBelow:
                 shift = QPoint((label.width() / 2) - 1, -handle_rect.height() + 8)
             else:
                 shift = QPoint((label.width() / 2) - 1, handle_rect.height() + 8)
         else:
-            if self._label_position == self.LabelPosition.LabelsLeft:
+            if self._handle_label_position == LabelPosition.LabelsLeft:
                 shift = QPoint(handle_rect.width() + 12, (label.height() / 2) - 1)
             else:
                 shift = QPoint(-handle_rect.width() + 8, (label.height() / 2) - 1)
@@ -135,23 +173,25 @@ class QLabeledRangeSlider(QAbstractSlider):
             label.clearFocus()
 
     def _min_label_edited(self, val):
-        if self._edges_show_range:
+        if self._edge_label_mode == EdgeLabelMode.LabelIsRange:
             self.setMinimum(val)
         else:
             v = list(self._slider.value())
             v[0] = val
             self.setValue(v)
+        self._reposition_labels()
 
     def _max_label_edited(self, val):
-        if self._edges_show_range:
-            self.setmaximum(val)
+        if self._edge_label_mode == EdgeLabelMode.LabelIsRange:
+            self.setMaximum(val)
         else:
             v = list(self._slider.value())
             v[-1] = val
             self.setValue(v)
+        self._reposition_labels()
 
     def _on_value_changed(self, v):
-        if not self._edges_show_range:
+        if self._edge_label_mode == EdgeLabelMode.LabelIsValue:
             self._min_label.setValue(v[0])
             self._max_label.setValue(v[-1])
 
@@ -174,7 +214,7 @@ class QLabeledRangeSlider(QAbstractSlider):
         self._slider.setRange(min, max)
         for lbl in self._handle_labels:
             lbl.setRange(min, max)
-        if self._edges_show_range:
+        if self._edge_label_mode == EdgeLabelMode.LabelIsRange:
             self._min_label.setValue(min)
             self._max_label.setValue(max)
 
@@ -197,9 +237,9 @@ class QLabeledRangeSlider(QAbstractSlider):
             layout.addWidget(self._slider)
             layout.addWidget(self._min_label)
             # TODO: set margins based on label width
-            if self._label_position == self.LabelPosition.LabelsLeft:
+            if self._handle_label_position == LabelPosition.LabelsLeft:
                 marg = (30, 0, 0, 0)
-            elif self._label_position == self.LabelPosition.NoLabel:
+            elif self._handle_label_position == LabelPosition.NoLabel:
                 marg = (0, 0, 0, 0)
             else:
                 marg = (0, 0, 20, 0)
@@ -207,9 +247,9 @@ class QLabeledRangeSlider(QAbstractSlider):
         else:
             layout = QHBoxLayout()
             layout.setSpacing(7)
-            if self._label_position == self.LabelPosition.LabelsBelow:
+            if self._handle_label_position == LabelPosition.LabelsBelow:
                 marg = (0, 0, 0, 25)
-            elif self._label_position == self.LabelPosition.NoLabel:
+            elif self._handle_label_position == LabelPosition.NoLabel:
                 marg = (0, 0, 0, 0)
             else:
                 marg = (0, 25, 0, 0)
@@ -225,6 +265,8 @@ class QLabeledRangeSlider(QAbstractSlider):
         self.setLayout(layout)
         layout.setContentsMargins(*marg)
         super().setOrientation(orientation)
+        QApplication.processEvents()
+        self._reposition_labels()
 
     def resizeEvent(self, a0) -> None:
         super().resizeEvent(a0)
@@ -236,46 +278,73 @@ class SliderLabel(QSpinBox):
         self, slider: QSlider, parent=None, alignment=Qt.AlignCenter, connect=None
     ) -> None:
         super().__init__(parent=parent)
+        self._slider = slider
         self.setFocusPolicy(Qt.ClickFocus)
-        # TODO: slider labels on top should have min/max set to the value of the
-        # other label
+        self.setMode(EdgeLabelMode.LabelIsValue)
 
         self.setRange(slider.minimum(), slider.maximum())
-        slider.rangeChanged.connect(self.setRange)
-        slider.rangeChanged.connect(self._update_max_size)
+        slider.rangeChanged.connect(self._update_size)
         self.setAlignment(alignment)
         self.setButtonSymbols(QSpinBox.NoButtons)
         self.setStyleSheet("background:transparent; border: 0;")
         if connect is not None:
             self.editingFinished.connect(lambda: connect(self.value()))
         self.editingFinished.connect(self.clearFocus)
-        self._update_max_size()
+        self._update_size()
 
-    def _update_max_size(self):
+    def _update_size(self):
         # fontmetrics to measure the width of text
         fm = QFontMetrics(self.font())
         h = self.sizeHint().height()
         fixed_content = self.prefix() + self.suffix() + " "
 
-        # determine width based on min/max/specialValue
-        s = self.textFromValue(self.minimum())[:18] + fixed_content
-        w = max(0, fm.horizontalAdvance(s))
-        s = self.textFromValue(self.maximum())[:18] + fixed_content
-        w = max(w, fm.horizontalAdvance(s))
-        if self.specialValueText():
-            w = max(w, fm.horizontalAdvance(self.specialValueText()))
-        w += 3  # cursor blinking space
+        if self._mode == EdgeLabelMode.LabelIsValue:
+            # determine width based on min/max/specialValue
+            s = self.textFromValue(self.minimum())[:18] + fixed_content
+            w = max(0, fm.horizontalAdvance(s))
+            s = self.textFromValue(self.maximum())[:18] + fixed_content
+            w = max(w, fm.horizontalAdvance(s))
+            if self.specialValueText():
+                w = max(w, fm.horizontalAdvance(self.specialValueText()))
+        else:
+            s = self.textFromValue(self.value())
+            w = max(0, fm.horizontalAdvance(s)) + 3
 
+        w += 3  # cursor blinking space
         # get the final size hint
         opt = QStyleOptionSpinBox()
         self.initStyleOption(opt)
         size = self.style().sizeFromContents(QStyle.CT_SpinBox, opt, QSize(w, h), self)
         self.setFixedSize(size)
 
+    def setValue(self, val):
+        super().setValue(val)
+        if self._mode == EdgeLabelMode.LabelIsRange:
+            self._update_size()
+
     def setMaximum(self, max: int) -> None:
         super().setMaximum(max)
-        self._update_size()
+        if self._mode == EdgeLabelMode.LabelIsValue:
+            self._update_size()
 
     def setMinimum(self, min: int) -> None:
         super().setMinimum(min)
+        if self._mode == EdgeLabelMode.LabelIsValue:
+            self._update_size()
+
+    def setMode(self, opt: EdgeLabelMode):
+        # when the edge labels are controlling slider range,
+        # we want them to have a big range, but not have a huge label
+        self._mode = opt
+        if opt == EdgeLabelMode.LabelIsRange:
+            self.setMinimum(-9999999)
+            self.setMaximum(9999999)
+            try:
+                self._slider.rangeChanged.disconnect(self.setRange)
+            except Exception:
+                pass
+        else:
+            self.setMinimum(self._slider.minimum())
+            self.setMaximum(self._slider.maximum())
+            self._slider.rangeChanged.connect(self.setRange)
         self._update_size()

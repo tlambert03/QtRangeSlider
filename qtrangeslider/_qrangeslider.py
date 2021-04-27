@@ -195,7 +195,7 @@ class QRangeSlider(QSlider):
                 offset = self.minimum() - ref[0]
         self.setSliderPosition([i + offset for i in ref])
 
-    def _spreadAllPositions(self, shrink=False, gain=1.2, ref=None) -> None:
+    def _spreadAllPositions(self, shrink=False, gain=1.1, ref=None) -> None:
         if ref is None:
             ref = self._position
         # if self._bar_is_rigid:  # TODO
