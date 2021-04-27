@@ -46,6 +46,7 @@ class QLabeledSlider(QAbstractSlider):
         super().__init__(parent)
 
         self._slider = QSlider()
+        self._slider.valueChanged.connect(self.valueChanged.emit)
         self._label = SliderLabel(self._slider, connect=self.setValue)
 
         self.valueChanged.connect(self._label.setValue)
@@ -101,6 +102,8 @@ class QLabeledRangeSlider(QAbstractSlider):
         self._handle_label_position: LabelPosition = LabelPosition.LabelsAbove
 
         self._slider = QRangeSlider()
+        self._slider.valueChanged.connect(self.valueChanged.emit)
+
         self._min_label = SliderLabel(
             self._slider, alignment=Qt.AlignLeft, connect=self._min_label_edited
         )
@@ -126,6 +129,7 @@ class QLabeledRangeSlider(QAbstractSlider):
                 lbl.hide()
             else:
                 lbl.show()
+                pass
         self.setOrientation(self.orientation())
 
     def edgeLabelMode(self) -> EdgeLabelMode:
@@ -137,8 +141,9 @@ class QLabeledRangeSlider(QAbstractSlider):
             self._min_label.hide()
             self._max_label.hide()
         else:
-            self._min_label.show()
-            self._max_label.show()
+            if self.isVisible():
+                self._min_label.show()
+                self._max_label.show()
             self._min_label.setMode(opt)
             self._max_label.setMode(opt)
         if opt == EdgeLabelMode.LabelIsValue:
@@ -224,7 +229,6 @@ class QLabeledRangeSlider(QAbstractSlider):
     def setValue(self, v: int) -> None:
         self._slider.setValue(v)
         self.sliderChange(QSlider.SliderValueChange)
-        self.valueChanged.emit(tuple(self._slider.value()))
 
     def setOrientation(self, orientation):
         """Set orientation, value will be 'horizontal' or 'vertical'."""
