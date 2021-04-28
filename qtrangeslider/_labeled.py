@@ -101,6 +101,10 @@ class QLabeledRangeSlider(QAbstractSlider):
         self._handle_labels = []
         self._handle_label_position: LabelPosition = LabelPosition.LabelsAbove
 
+        # for fine tuning label position
+        self.label_shift_x = 0
+        self.label_shift_y = 0
+
         self._slider = QRangeSlider()
         self._slider.valueChanged.connect(self.valueChanged.emit)
 
@@ -158,22 +162,26 @@ class QLabeledRangeSlider(QAbstractSlider):
     def _reposition_labels(self):
         if not self._handle_labels:
             return
-        handle_rect = self._slider._handleRects(None, 0)
-        label = self._handle_labels[0]
-        if self.orientation() == Qt.Horizontal:
-            if self._handle_label_position == LabelPosition.LabelsBelow:
-                shift = QPoint((label.width() / 2) - 1, -handle_rect.height() + 8)
-            else:
-                shift = QPoint((label.width() / 2) - 1, handle_rect.height() + 8)
-        else:
-            if self._handle_label_position == LabelPosition.LabelsLeft:
-                shift = QPoint(handle_rect.width() + 12, (label.height() / 2) - 1)
-            else:
-                shift = QPoint(-handle_rect.width() + 8, (label.height() / 2) - 1)
+
+        horizontal = self.orientation() == Qt.Horizontal
+        labels_above = self._handle_label_position == LabelPosition.LabelsAbove
 
         for label, rect in zip(self._handle_labels, self._slider._handleRects()):
-            pos = rect.center() - shift
-            label.move(self._slider.mapToParent(pos))
+            dx = -label.width() / 2
+            dy = -label.height() / 2
+            if labels_above:
+                if horizontal:
+                    dy *= 3
+                else:
+                    dx *= -1
+            else:
+                if horizontal:
+                    dy *= -1
+                else:
+                    dx *= 3
+            pos = self._slider.mapToParent(rect.center())
+            pos += QPoint(dx + self.label_shift_x, dy + self.label_shift_y)
+            label.move(pos)
             label.clearFocus()
 
     def _min_label_edited(self, val):
@@ -221,6 +229,7 @@ class QLabeledRangeSlider(QAbstractSlider):
         if self._edge_label_mode == EdgeLabelMode.LabelIsRange:
             self._min_label.setValue(min)
             self._max_label.setValue(max)
+        self._reposition_labels()
 
     def value(self):
         return self._slider.value()
