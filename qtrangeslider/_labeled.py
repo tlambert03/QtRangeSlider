@@ -1,7 +1,7 @@
 from enum import IntEnum
 from functools import partial
 
-from ._float_slider import QDoubleSlider
+from ._float_slider import QDoubleRangeSlider, QDoubleSlider
 from ._qrangeslider import QRangeSlider
 from .qtcompat.QtCore import QPoint, QSize, Qt, Signal
 from .qtcompat.QtGui import QFontMetrics
@@ -98,6 +98,7 @@ class QLabeledRangeSlider(QAbstractSlider):
     valueChanged = Signal(tuple)
     LabelPosition = LabelPosition
     EdgeLabelMode = EdgeLabelMode
+    _slider_class = QRangeSlider
 
     def __init__(self, *args) -> None:
         parent = None
@@ -119,7 +120,7 @@ class QLabeledRangeSlider(QAbstractSlider):
         self.label_shift_x = 0
         self.label_shift_y = 0
 
-        self._slider = QRangeSlider()
+        self._slider = self._slider_class()
         self._slider.valueChanged.connect(self.valueChanged.emit)
 
         self._min_label = SliderLabel(
@@ -248,7 +249,7 @@ class QLabeledRangeSlider(QAbstractSlider):
     def value(self):
         return self._slider.value()
 
-    def setValue(self, v: int) -> None:
+    def setValue(self, v) -> None:
         self._slider.setValue(v)
         self.sliderChange(QSlider.SliderValueChange)
 
@@ -297,6 +298,16 @@ class QLabeledRangeSlider(QAbstractSlider):
     def resizeEvent(self, a0) -> None:
         super().resizeEvent(a0)
         self._reposition_labels()
+
+
+class QLabeledDoubleRangeSlider(QLabeledRangeSlider):
+    _slider_class = QDoubleRangeSlider
+
+    # TODO
+    def _reposition_labels(self):
+        super()._reposition_labels()
+        for lbl in self._handle_labels:
+            lbl.setDecimals(2)
 
 
 class SliderLabel(QDoubleSpinBox):
