@@ -3,7 +3,14 @@ try:
 except ImportError:
     __version__ = "unknown"
 
+from ._float_slider import QDoubleRangeSlider, QDoubleSlider
 from ._labeled import QLabeledRangeSlider, QLabeledSlider
 from ._qrangeslider import QRangeSlider
 
-__all__ = ["QRangeSlider", "QLabeledRangeSlider", "QLabeledSlider"]
+__all__ = [
+    "QRangeSlider",
+    "QDoubleRangeSlider",
+    "QDoubleSlider",
+    "QLabeledRangeSlider",
+    "QLabeledSlider",
+]

@@ -1,12 +1,14 @@
 from enum import IntEnum
 from functools import partial
 
+from ._float_slider import QDoubleSlider
 from ._qrangeslider import QRangeSlider
 from .qtcompat.QtCore import QPoint, QSize, Qt, Signal
 from .qtcompat.QtGui import QFontMetrics
 from .qtcompat.QtWidgets import (
     QAbstractSlider,
     QApplication,
+    QDoubleSpinBox,
     QHBoxLayout,
     QSlider,
     QSpinBox,
@@ -32,6 +34,8 @@ class EdgeLabelMode(IntEnum):
 
 
 class QLabeledSlider(QAbstractSlider):
+    _slider_class = QSlider
+
     def __init__(self, *args) -> None:
         parent = None
         orientation = Qt.Horizontal
@@ -45,8 +49,9 @@ class QLabeledSlider(QAbstractSlider):
 
         super().__init__(parent)
 
-        self._slider = QSlider()
+        self._slider = self._slider_class()
         self._slider.valueChanged.connect(self.valueChanged.emit)
+        self._slider.valueChanged.connect(lambda e: print("slidervc", e))
         self._label = SliderLabel(self._slider, connect=self.setValue)
 
         self.valueChanged.connect(self._label.setValue)
@@ -78,6 +83,15 @@ class QLabeledSlider(QAbstractSlider):
 
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
+
+
+class QLabeledDoubleSlider(QLabeledSlider):
+    _slider_class = QDoubleSlider
+    valueChanged = Signal(float)
+
+    def __init__(self, *args) -> None:
+        super().__init__(*args)
+        self._label.setDecimals(2)
 
 
 class QLabeledRangeSlider(QAbstractSlider):
@@ -285,7 +299,7 @@ class QLabeledRangeSlider(QAbstractSlider):
         self._reposition_labels()
 
 
-class SliderLabel(QSpinBox):
+class SliderLabel(QDoubleSpinBox):
     def __init__(
         self, slider: QSlider, parent=None, alignment=Qt.AlignCenter, connect=None
     ) -> None:
@@ -293,6 +307,7 @@ class SliderLabel(QSpinBox):
         self._slider = slider
         self.setFocusPolicy(Qt.ClickFocus)
         self.setMode(EdgeLabelMode.LabelIsValue)
+        self.setDecimals(0)
 
         self.setRange(slider.minimum(), slider.maximum())
         slider.rangeChanged.connect(self._update_size)
@@ -302,6 +317,10 @@ class SliderLabel(QSpinBox):
         if connect is not None:
             self.editingFinished.connect(lambda: connect(self.value()))
         self.editingFinished.connect(self.clearFocus)
+        self._update_size()
+
+    def setDecimals(self, prec: int) -> None:
+        super().setDecimals(prec)
         self._update_size()
 
     def _update_size(self):
@@ -360,3 +379,9 @@ class SliderLabel(QSpinBox):
             self.setMaximum(self._slider.maximum())
             self._slider.rangeChanged.connect(self.setRange)
         self._update_size()
+
+    def validate(self, input: str, pos: int):
+        # fake like an integer spinbox
+        if "." in input:
+            return 0, input, len(input)
+        return super().validate(input, pos)
