@@ -14,7 +14,7 @@ from qtrangeslider.qtcompat.QtWidgets import (
 
 app = QApplication([])
 
-ORIENTATION = Qt.Vertical
+ORIENTATION = Qt.Horizontal
 
 w = QWidget()
 qls = QLabeledSlider(ORIENTATION)
