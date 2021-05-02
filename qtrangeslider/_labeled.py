@@ -249,9 +249,9 @@ class QLabeledRangeSlider(SliderProxy, QAbstractSlider):
             pos += QPoint(int(dx + self.label_shift_x), int(dy + self.label_shift_y))
             if last_edge is not None:
                 if horizontal:
-                    pos.setX(max(pos.x(), last_edge.x() - dx + MIN_DIST))
+                    pos.setX(int(max(pos.x(), last_edge.x() - dx + MIN_DIST)))
                 else:
-                    pos.setX(max(pos.y(), last_edge.y() - dy + MIN_DIST))
+                    pos.setX(int(max(pos.y(), last_edge.y() - dy + MIN_DIST)))
             label.move(pos)
             last_edge = pos
             label.clearFocus()
