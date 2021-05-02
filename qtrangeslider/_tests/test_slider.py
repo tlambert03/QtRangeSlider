@@ -1,11 +1,15 @@
-import os
+import platform
 
 import pytest
 
 from qtrangeslider import QRangeSlider
+from qtrangeslider.qtcompat import API_NAME
 from qtrangeslider.qtcompat.QtCore import Qt
 
-WINDOWS = os.name == "nt"
+NOT_LINUX = platform.system() != "Linux"
+NOT_PYSIDE2 = API_NAME != "PySide2"
+
+skipmouse = pytest.mark.skipif(NOT_LINUX or NOT_PYSIDE2, reason="mouse tests finicky")
 
 
 @pytest.mark.parametrize("orientation", ["Horizontal", "Vertical"])
@@ -14,7 +18,7 @@ def test_basic(qtbot, orientation):
     qtbot.addWidget(rs)
 
 
-@pytest.mark.skipif(WINDOWS, reason="QTest.mouseMove not working on windows")
+@skipmouse
 def test_drag_handles(qtbot):
     rs = QRangeSlider(Qt.Horizontal)
     qtbot.addWidget(rs)
@@ -62,7 +66,7 @@ def test_drag_handles(qtbot):
     assert rs._pressedControl == rs._NULL_CTRL
 
 
-@pytest.mark.skipif(WINDOWS, reason="QTest.mouseMove not working on windows")
+@skipmouse
 def test_drag_handles_beyond_edge(qtbot):
     rs = QRangeSlider(Qt.Horizontal)
     qtbot.addWidget(rs)
@@ -89,7 +93,7 @@ def test_drag_handles_beyond_edge(qtbot):
     assert rs.value()[1] == 99
 
 
-@pytest.mark.skipif(WINDOWS, reason="QTest.mouseMove not working on windows")
+@skipmouse
 def test_bar_drag_beyond_edge(qtbot):
     rs = QRangeSlider(Qt.Horizontal)
     qtbot.addWidget(rs)
