@@ -485,11 +485,12 @@ class QRangeSlider(_HookedSlider, QSlider):
 
     def _neighbor_bound(self, val: int, index: int, _lst: List[int]) -> int:
         # make sure we don't go lower than any preceding index:
+        min_dist = self._post_get_hook(self.singleStep())
         if index > 0:
-            val = max(_lst[index - 1] + self.singleStep(), val)
+            val = max(_lst[index - 1] + min_dist, val)
         # make sure we don't go higher than any following index:
         if index < (len(_lst) - 1):
-            val = min(_lst[index + 1] - self.singleStep(), val)
+            val = min(_lst[index + 1] - min_dist, val)
         return val
 
     def wheelEvent(self, e: QtGui.QWheelEvent) -> None:

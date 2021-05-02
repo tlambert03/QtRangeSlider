@@ -230,7 +230,7 @@ class QLabeledRangeSlider(SliderProxy, QAbstractSlider):
         horizontal = self.orientation() == Qt.Horizontal
         labels_above = self._handle_label_position == LabelPosition.LabelsAbove
 
-        MIN_DIST = 8
+        MIN_DIST = 10
         last_edge = None
         for label, rect in zip(self._handle_labels, self._slider._handleRects()):
             dx = -label.width() / 2
