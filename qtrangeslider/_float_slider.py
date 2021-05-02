@@ -12,7 +12,8 @@ class QDoubleSlider(_HookedSlider):
 
     def __init__(self, *args):
         super().__init__(*args)
-        self.setDecimals(2)
+        self._multiplier = 10 ** 2
+        self.setMinimum(0)
         self.setMaximum(99)
         self.setSingleStep(1)
         self.setPageStep(10)
@@ -31,7 +32,30 @@ class QDoubleSlider(_HookedSlider):
 
         Sets how many decimals the slider uses for displaying and interpreting doubles.
         """
+        previous = self._multiplier
         self._multiplier = 10 ** int(prec)
+        ratio = self._multiplier / previous
+
+        if ratio != 1:
+            self.blockSignals(True)
+            try:
+                newmin = self.minimum() * ratio
+                newmax = self.maximum() * ratio
+                newval = self.value() * ratio
+                newstep = self.singleStep() * ratio
+                newpage = self.pageStep() * ratio
+                self.setRange(newmin, newmax)
+                self.setValue(newval)
+                self.setSingleStep(newstep)
+                self.setPageStep(newpage)
+            except OverflowError as err:
+                self._multiplier = previous
+                raise OverflowError(
+                    f"Cannot use {prec} decimals with a range of {newmin}-"
+                    f"{newmax}. If you need this feature, please open a feature"
+                    " request at github."
+                ) from err
+            self.blockSignals(False)
 
     def _post_get_hook(self, value: int) -> float:
         return value / self._multiplier
