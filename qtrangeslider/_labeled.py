@@ -4,7 +4,7 @@ from functools import partial
 from ._float_slider import QDoubleRangeSlider, QDoubleSlider
 from ._qrangeslider import QRangeSlider
 from .qtcompat.QtCore import QPoint, QSize, Qt, Signal
-from .qtcompat.QtGui import QFontMetrics
+from .qtcompat.QtGui import QFontMetrics, QValidator
 from .qtcompat.QtWidgets import (
     QAbstractSlider,
     QApplication,
@@ -448,6 +448,6 @@ class SliderLabel(QDoubleSpinBox):
 
     def validate(self, input: str, pos: int):
         # fake like an integer spinbox
-        if "." in input:
-            return 0, input, len(input)
+        if "." in input and self.decimals() < 1:
+            return QValidator.Invalid, input, len(input)
         return super().validate(input, pos)
