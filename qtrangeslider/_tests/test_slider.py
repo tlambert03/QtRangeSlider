@@ -1,4 +1,3 @@
-import os
 import platform
 
 import pytest
@@ -9,9 +8,8 @@ from qtrangeslider.qtcompat.QtCore import Qt
 
 NOT_LINUX = platform.system() != "Linux"
 NOT_PYSIDE2 = API_NAME != "PySide2"
-skipmouse = pytest.mark.skipif(
-    os.getenv("CI") and (NOT_LINUX or NOT_PYSIDE2), reason="mouse tests finicky"
-)
+
+skipmouse = pytest.mark.skipif(NOT_LINUX or NOT_PYSIDE2, reason="mouse tests finicky")
 
 
 @pytest.mark.parametrize("orientation", ["Horizontal", "Vertical"])
