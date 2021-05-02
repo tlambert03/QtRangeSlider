@@ -1,3 +1,6 @@
+import math
+from typing import Tuple
+
 from ._hooked import _HookedSlider
 from ._qrangeslider import QRangeSlider
 from .qtcompat.QtCore import Signal
@@ -23,8 +26,6 @@ class QDoubleSlider(_HookedSlider):
 
     def decimals(self) -> int:
         """This property holds the precision of the slider, in decimals."""
-        import math
-
         return int(math.log10(self._multiplier))
 
     def setDecimals(self, prec: int):
@@ -41,7 +42,7 @@ class QDoubleSlider(_HookedSlider):
             try:
                 newmin = self.minimum() * ratio
                 newmax = self.maximum() * ratio
-                newval = self.value() * ratio
+                newval = self._scale_value(ratio)
                 newstep = self.singleStep() * ratio
                 newpage = self.pageStep() * ratio
                 self.setRange(newmin, newmax)
@@ -56,6 +57,10 @@ class QDoubleSlider(_HookedSlider):
                     " request at github."
                 ) from err
             self.blockSignals(False)
+
+    def _scale_value(self, p):
+        # for subclasses
+        return self.value() * p
 
     def _post_get_hook(self, value: int) -> float:
         return value / self._multiplier
@@ -72,30 +77,18 @@ class QDoubleSlider(_HookedSlider):
 class QDoubleRangeSlider(QRangeSlider, QDoubleSlider):
     rangeChanged = Signal(float, float)
 
+    def value(self) -> Tuple[float, ...]:
+        """Get current value of the widget as a tuple of integers."""
+        return tuple(float(i) for i in self._value)
 
-# def _update_precision(self, minimum=None, maximum=None, step=None):
-#     """Called when min/max/step is changed.
+    def _min_max_bound(self, val: int) -> float:
+        return round(super()._min_max_bound(val), self.decimals())
 
-#     _precision is the factor that converts from integer representation in the slider
-#     widget, to the actual float representation needed.
-#     """
-#     orig = self._precision
+    def _scale_value(self, p):
+        # This function is called during setDecimals...
+        # but because QRangeSlider has a private nonQt `_value`
+        # we don't actually need to scale
+        return self._value
 
-#     if minimum is not None or maximum is not None:
-#         _min = minimum or self.minimum()
-#         _max = maximum or self.maximum()
-
-#         # make sure val * precision is within int32 overflow limit for Qt
-#         val = max([abs(_min), abs(_max)])
-#         while abs(self._precision * val) >= 2 ** 32 // 2:
-#             self._precision *= 0.1
-#     elif step:
-#         while step < (1 / self._precision):
-#             self._precision *= 10
-
-#     ratio = self._precision / orig
-#     if ratio != 1:
-#         self.setValue([i * ratio for i in self.value()])
-#         if not step:
-#             self.setMaximum(self.maximum() * ratio)
-#             self.setMinimum(self.minimum() * ratio)
+    def setDecimals(self, prec: int):
+        return super().setDecimals(prec)

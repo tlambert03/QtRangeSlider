@@ -94,7 +94,7 @@ class QRangeSlider(_HookedSlider, QSlider):
 
         The number of handles will be equal to the length of the sequence
         """
-        if not isinstance(val, abc.Sequence) and len(val) >= 2:
+        if not (isinstance(val, abc.Sequence) and len(val) >= 2):
             raise ValueError("value must be iterable of len >= 2")
         val = [self._min_max_bound(v) for v in val]
         if self._value == val and self._position == val:
