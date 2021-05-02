@@ -69,6 +69,8 @@ class QRangeSlider(_HookedSlider, QSlider):
         self._repeatMultiplier = 1  # TODO
         # for wheel nav
         self._offset_accum = 0
+        # fraction of total range to scroll when holding Ctrl while scrolling
+        self._control_fraction = 0.04
 
         # color
         self._style = RangeSliderStyle()
@@ -484,10 +486,10 @@ class QRangeSlider(_HookedSlider, QSlider):
     def _neighbor_bound(self, val: int, index: int, _lst: List[int]) -> int:
         # make sure we don't go lower than any preceding index:
         if index > 0:
-            val = max(_lst[index - 1], val)
+            val = max(_lst[index - 1] + self.singleStep(), val)
         # make sure we don't go higher than any following index:
-        if index < len(_lst) - 1:
-            val = min(_lst[index + 1], val)
+        if index < (len(_lst) - 1):
+            val = min(_lst[index + 1] - self.singleStep(), val)
         return val
 
     def wheelEvent(self, e: QtGui.QWheelEvent) -> None:
@@ -511,9 +513,16 @@ class QRangeSlider(_HookedSlider, QSlider):
         if orientation == Qt.Horizontal:
             delta *= -1
         offset = delta / 120
-        if modifiers & Qt.ControlModifier or modifiers & Qt.ShiftModifier:
+        if modifiers & Qt.ShiftModifier:
             # Scroll one page regardless of delta:
             steps_to_scroll = _bound(-pg_step, pg_step, int(offset * pg_step))
+            self._offset_accum = 0
+        elif modifiers & Qt.ControlModifier:
+            # Scroll one page regardless of delta:
+            _range = self._pre_set_hook(self.maximum()) - self._pre_set_hook(
+                self.minimum()
+            )
+            steps_to_scroll = offset * _range * self._control_fraction
             self._offset_accum = 0
         else:
             # Calculate how many lines to scroll. Depending on what delta is (and
