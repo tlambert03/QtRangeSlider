@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from qtrangeslider import (
@@ -6,6 +8,7 @@ from qtrangeslider import (
     QLabeledDoubleRangeSlider,
     QLabeledDoubleSlider,
 )
+from qtrangeslider.qtcompat import API_NAME
 
 range_types = {QDoubleRangeSlider, QLabeledDoubleRangeSlider}
 
@@ -114,6 +117,9 @@ def test_double_sliders_big(ds):
     ds.assert_val_eq((1.74e9, 1.432e10))
 
 
+@pytest.mark.skipif(
+    os.name == "nt" and API_NAME == "PyQt6", reason="Not ready for pyqt6"
+)
 def test_signals(ds, qtbot):
     with qtbot.waitSignal(ds.valueChanged):
         ds.setValue((10, 20))
