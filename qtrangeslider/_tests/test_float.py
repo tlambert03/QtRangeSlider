@@ -111,5 +111,18 @@ def test_double_sliders_big(ds):
     assert ds.minimum() == 0
     assert ds.maximum() == 5e14
     ds.setValue((1.74e9, 1.432e10))
-    print("v", ds.value())
-    # ds.assert_val_eq((1.74e9, 1.432e10))
+    ds.assert_val_eq((1.74e9, 1.432e10))
+
+
+def test_signals(ds, qtbot):
+    with qtbot.waitSignal(ds.valueChanged):
+        ds.setValue((10, 20))
+
+    with qtbot.waitSignal(ds.rangeChanged):
+        ds.setMinimum(0.5)
+
+    with qtbot.waitSignal(ds.rangeChanged):
+        ds.setMaximum(3.7)
+
+    with qtbot.waitSignal(ds.rangeChanged):
+        ds.setRange(1.2, 3.3)

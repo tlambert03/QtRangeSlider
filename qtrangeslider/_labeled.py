@@ -89,6 +89,7 @@ class QLabeledSlider(SliderProxy, QAbstractSlider):
 
         self._slider = self._slider_class()
         self._slider.valueChanged.connect(self.valueChanged.emit)
+        self._slider.rangeChanged.connect(self.rangeChanged.emit)
         self._label = SliderLabel(self._slider, connect=self.setValue)
 
         self.valueChanged.connect(self._label.setValue)
@@ -126,6 +127,7 @@ class QLabeledDoubleSlider(QLabeledSlider):
     _slider_class = QDoubleSlider
     _slider: QDoubleSlider
     valueChanged = Signal(float)
+    rangeChanged = Signal(float, float)
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
@@ -168,6 +170,7 @@ class QLabeledRangeSlider(SliderProxy, QAbstractSlider):
 
         self._slider = self._slider_class()
         self._slider.valueChanged.connect(self.valueChanged.emit)
+        self._slider.rangeChanged.connect(self.rangeChanged.emit)
 
         self._min_label = SliderLabel(
             self._slider, alignment=Qt.AlignLeft, connect=self._min_label_edited
@@ -349,6 +352,7 @@ class QLabeledRangeSlider(SliderProxy, QAbstractSlider):
 class QLabeledDoubleRangeSlider(QLabeledRangeSlider):
     _slider_class = QDoubleRangeSlider
     _slider: QDoubleRangeSlider
+    rangeChanged = Signal(float, float)
 
     def __init__(self, *args) -> None:
         super().__init__(*args)

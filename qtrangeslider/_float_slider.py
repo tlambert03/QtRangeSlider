@@ -71,6 +71,8 @@ class QDoubleSlider(_HookedSlider):
     def sliderChange(self, change) -> None:
         if change == self.SliderValueChange:
             self.valueChanged.emit(self.value())
+        if change == self.SliderRangeChange:
+            self.rangeChanged.emit(self.minimum(), self.maximum())
         return super().sliderChange(self.SliderChange(change))
 
 
