@@ -46,8 +46,8 @@ class QRangeSlider(_HookedSlider, QSlider):
 
     _NULL_CTRL = ("None", -1)
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         # list of values
         self._value: List[int] = [20, 80]
@@ -504,9 +504,7 @@ class QRangeSlider(_HookedSlider, QSlider):
         if self._scrollByDelta(orientation, e.modifiers(), delta):
             e.accept()
 
-    def _scrollByDelta(
-        self, orientation, modifiers: Qt.KeyboardModifiers, delta: int
-    ) -> bool:
+    def _scrollByDelta(self, orientation, modifiers, delta: int) -> bool:
         steps_to_scroll = 0
         pg_step = self.pageStep()
 
