@@ -146,8 +146,8 @@ class QLabeledDoubleSlider(QLabeledSlider):
     valueChanged = Signal(float)
     rangeChanged = Signal(float, float)
 
-    def __init__(self, *args) -> None:
-        super().__init__(*args)
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.setDecimals(2)
 
     def decimals(self) -> int:
@@ -165,17 +165,8 @@ class QLabeledRangeSlider(SliderProxy, QAbstractSlider):
     _slider_class = QRangeSlider
     _slider: QRangeSlider
 
-    def __init__(self, *args) -> None:
-        parent = None
-        orientation = Qt.Horizontal
-        if len(args) == 2:
-            orientation, parent = args
-        elif args:
-            if isinstance(args[0], QWidget):
-                parent = args[0]
-            else:
-                orientation = args[0]
-
+    def __init__(self, *args, **kwargs) -> None:
+        parent, orientation = _handle_overloaded_slider_sig(args, kwargs)
         super().__init__(parent)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self._handle_labels = []
@@ -371,8 +362,8 @@ class QLabeledDoubleRangeSlider(QLabeledRangeSlider):
     _slider: QDoubleRangeSlider
     rangeChanged = Signal(float, float)
 
-    def __init__(self, *args) -> None:
-        super().__init__(*args)
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.setDecimals(2)
 
     def decimals(self) -> int:
