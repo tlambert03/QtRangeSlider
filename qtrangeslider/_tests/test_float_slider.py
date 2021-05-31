@@ -1,6 +1,5 @@
 import math
 
-import pyautogui
 import pytest
 
 from qtrangeslider import QDoubleSlider
@@ -77,6 +76,7 @@ def test_float_extremes(dslider, mag, qtbot):
 
 
 def test_slider_move_signals(dslider, qtbot):
+    pyautogui = pytest.importorskip("pyautogui")
 
     dslider.setValue(10)
     dslider.show()
