@@ -244,7 +244,7 @@ class QRangeSlider(_HookedSlider, QSlider):
 
         # draw groove and ticks
         opt.subControls = QStyle.SC_SliderGroove | QStyle.SC_SliderTickmarks
-        opt.sliderPosition = -10000000000
+        opt.sliderPosition = -1e10  # necessary for QDoubleRangeSlider
         painter.drawComplexControl(QStyle.CC_Slider, opt)
 
         if self._should_draw_bar:
@@ -485,7 +485,6 @@ class QRangeSlider(_HookedSlider, QSlider):
 
     def _neighbor_bound(self, val: int, index: int, _lst: List[int]) -> int:
         # make sure we don't go lower than any preceding index:
-        print("ss", self.singleStep())
         min_dist = self.singleStep()
         if index > 0:
             val = max(_lst[index - 1] + min_dist, val)
