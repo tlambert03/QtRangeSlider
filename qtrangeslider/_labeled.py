@@ -148,10 +148,9 @@ class QLabeledDoubleSlider(QLabeledSlider):
         self.setDecimals(2)
 
     def decimals(self) -> int:
-        return self._slider.decimals()
+        return self._label.decimals()
 
     def setDecimals(self, prec: int):
-        self._slider.setDecimals(prec)
         self._label.setDecimals(prec)
 
 
@@ -300,7 +299,8 @@ class QLabeledRangeSlider(SliderProxy, QAbstractSlider):
         self._reposition_labels()
 
     def _on_range_changed(self, min, max):
-        self._slider.setRange(min, max)
+        if (min, max) != (self._slider.minimum(), self._slider.maximum()):
+            self._slider.setRange(min, max)
         for lbl in self._handle_labels:
             lbl.setRange(min, max)
         if self._edge_label_mode == EdgeLabelMode.LabelIsRange:
@@ -372,10 +372,9 @@ class QLabeledDoubleRangeSlider(QLabeledRangeSlider):
         self.setDecimals(2)
 
     def decimals(self) -> int:
-        return self._slider.decimals()
+        return self._min_label.decimals()
 
     def setDecimals(self, prec: int):
-        self._slider.setDecimals(prec)
         self._min_label.setDecimals(prec)
         self._max_label.setDecimals(prec)
         for lbl in self._handle_labels:
@@ -406,7 +405,7 @@ class SliderLabel(QDoubleSpinBox):
         super().setDecimals(prec)
         self._update_size()
 
-    def _update_size(self):
+    def _update_size(self, *_):
         # fontmetrics to measure the width of text
         fm = QFontMetrics(self.font())
         h = self.sizeHint().height()
