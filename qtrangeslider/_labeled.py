@@ -1,7 +1,7 @@
 from enum import IntEnum
 from functools import partial
 
-from ._float_slider import QDoubleRangeSlider, QDoubleSlider
+from ._generic_qslider import QDoubleRangeSlider, QDoubleSlider
 from ._qrangeslider import QRangeSlider
 from .qtcompat.QtCore import QPoint, QSize, Qt, Signal
 from .qtcompat.QtGui import QFontMetrics, QValidator
