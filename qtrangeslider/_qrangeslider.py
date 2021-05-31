@@ -47,10 +47,9 @@ class QRangeSlider(_HookedSlider, QSlider):
     _NULL_CTRL = ("None", -1)
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
         # list of values
         self._value: List[int] = [20, 80]
+        super().__init__(*args, **kwargs)
 
         # list of current positions of each handle. same length as _value
         # If tracking is enabled (the default) this will be identical to _value
@@ -245,6 +244,7 @@ class QRangeSlider(_HookedSlider, QSlider):
 
         # draw groove and ticks
         opt.subControls = QStyle.SC_SliderGroove | QStyle.SC_SliderTickmarks
+        opt.sliderPosition = -10000000000
         painter.drawComplexControl(QStyle.CC_Slider, opt)
 
         if self._should_draw_bar:
@@ -485,7 +485,8 @@ class QRangeSlider(_HookedSlider, QSlider):
 
     def _neighbor_bound(self, val: int, index: int, _lst: List[int]) -> int:
         # make sure we don't go lower than any preceding index:
-        min_dist = self._post_get_hook(self.singleStep())
+        print("ss", self.singleStep())
+        min_dist = self.singleStep()
         if index > 0:
             val = max(_lst[index - 1] + min_dist, val)
         # make sure we don't go higher than any following index:
