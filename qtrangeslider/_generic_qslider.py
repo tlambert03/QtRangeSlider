@@ -9,8 +9,10 @@ from .qtcompat.QtWidgets import (
     QStylePainter,
 )
 
+# from ._qrangeslider import QRangeSlider
 
-class QDoubleSlider(QSlider):
+
+class _GenericSlider(QSlider):
     valueChanged = Signal(float)  # type: ignore
     sliderMoved = Signal(float)  # type: ignore
     rangeChanged = Signal(float, float)  # type: ignore
@@ -142,7 +144,9 @@ class QDoubleSlider(QSlider):
         # option.singleStep = self._singleStep  # type: ignore
         if self.orientation() == Qt.Horizontal:
             option.state |= QStyle.State_Horizontal
+        self._fixStyleOption(option)
 
+    def _fixStyleOption(self, option):
         # scale style option to integer space
         _max = 10000
         option.minimum = 0
@@ -423,9 +427,15 @@ def _sliderValueFromPosition(
     return max - tmp if upsideDown else tmp + min
 
 
+class QDoubleSlider(_GenericSlider):
+    pass
+
+
 class QDoubleRangeSlider:
     pass
 
+
+# class QDoubleRangeSlider(QRangeSlider, _GenericSlider):
 
 #     rangeChanged = Signal(float, float)
 

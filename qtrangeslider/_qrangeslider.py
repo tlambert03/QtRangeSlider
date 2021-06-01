@@ -2,7 +2,7 @@ import textwrap
 from collections import abc
 from typing import List, Sequence, Tuple
 
-from ._hooked import _HookedSlider
+from ._generic_qslider import _GenericSlider
 from ._style import RangeSliderStyle, update_styles_from_stylesheet
 from .qtcompat import QtGui
 from .qtcompat.QtCore import (
@@ -26,7 +26,7 @@ from .qtcompat.QtWidgets import (
 ControlType = Tuple[str, int]
 
 
-class QRangeSlider(_HookedSlider, QSlider):
+class QRangeSlider(_GenericSlider):
     """MultiHandle Range Slider widget.
 
     Same API as QSlider, but `value`, `setValue`, `sliderPosition`, and
@@ -212,9 +212,17 @@ class QRangeSlider(_HookedSlider, QSlider):
     def _getStyleOption(self) -> QStyleOptionSlider:
         opt = QStyleOptionSlider()
         self.initStyleOption(opt)
+        return opt
+
+    def _fixStyleOption(self, opt):
         opt.sliderValue = 0
         opt.sliderPosition = 0
-        return opt
+
+        opt.minimum = self._minimum
+        opt.maximum = self._maximum
+        # opt.tickInterval = self._tickInterval / _range * _max  # type: ignore
+        # opt.pageStep = self._pageStep / _range * _max  # type: ignore
+        # opt.singleStep = self._singleStep / _range * _max  # type: ignore
 
     def _getBarColor(self):
         return self._style.brush(self._getStyleOption())
@@ -254,13 +262,17 @@ class QRangeSlider(_HookedSlider, QSlider):
         opt.subControls = QStyle.SC_SliderHandle
         hidx = -1
         pidx = -1
-        if self._pressedControl[0] == "handle":
+        if self._pressedControl and self._pressedControl[0] == "handle":
             pidx = self._pressedControl[1]
-        elif self._hoverControl[0] == "handle":
-            hidx = self._hoverControl[1]
+        else:
+            try:
+                if self._hoverControl[0] == "handle":
+                    hidx = self._hoverControl[1]
+            except TypeError:
+                pass
         for idx, pos in enumerate(self._position):
-            opt.sliderPosition = self._pre_set_hook(pos)
-
+            opt.sliderPosition = pos
+            print(opt.sliderPosition, opt.maximum)
             if idx == pidx:  # make pressed handles appear sunken
                 opt.state |= QStyle.State_Sunken
             else:
@@ -365,14 +377,14 @@ class QRangeSlider(_HookedSlider, QSlider):
         style = self.style().proxy()
 
         if handle_index is not None:  # get specific handle rect
-            opt.sliderPosition = self._pre_set_hook(self._position[handle_index])
+            opt.sliderPosition = self._position[handle_index]
             return style.subControlRect(
                 QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self
             )
         else:
             rects = []
             for p in self._position:
-                opt.sliderPosition = self._pre_set_hook(p)
+                opt.sliderPosition = p
                 r = style.subControlRect(
                     QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self
                 )
@@ -468,14 +480,13 @@ class QRangeSlider(_HookedSlider, QSlider):
             sliderLength = handle_rect.height()
             sliderMin = groove_rect.y()
             sliderMax = groove_rect.bottom() - sliderLength + 1
-        v = QStyle.sliderValueFromPosition(
+        return QStyle.sliderValueFromPosition(
             opt.minimum,
             opt.maximum,
             pos - sliderMin,
             sliderMax - sliderMin,
             opt.upsideDown,
         )
-        return self._post_get_hook(v)
 
     def _pick(self, pt: QPoint) -> int:
         return pt.x() if self.orientation() == Qt.Horizontal else pt.y()
@@ -485,7 +496,7 @@ class QRangeSlider(_HookedSlider, QSlider):
 
     def _neighbor_bound(self, val: int, index: int, _lst: List[int]) -> int:
         # make sure we don't go lower than any preceding index:
-        min_dist = self._post_get_hook(self.singleStep())
+        min_dist = self.singleStep()
         if index > 0:
             val = max(_lst[index - 1] + min_dist, val)
         # make sure we don't go higher than any following index:
@@ -518,9 +529,8 @@ class QRangeSlider(_HookedSlider, QSlider):
             self._offset_accum = 0
         elif modifiers & Qt.ControlModifier:
             # Scroll one page regardless of delta:
-            _range = self._pre_set_hook(self.maximum()) - self._pre_set_hook(
-                self.minimum()
-            )
+            _range = self.maximum() - self.minimum()
+
             steps_to_scroll = offset * _range * self._control_fraction
             self._offset_accum = 0
         else:
@@ -562,7 +572,7 @@ class QRangeSlider(_HookedSlider, QSlider):
         if modifiers & Qt.AltModifier:
             self._spreadAllPositions(shrink=steps_to_scroll < 0)
         else:
-            self._offsetAllPositions(self._post_get_hook(steps_to_scroll))
+            self._offsetAllPositions(steps_to_scroll)
         self.triggerAction(QSlider.SliderMove)
 
         if _prev_value == self.value():
