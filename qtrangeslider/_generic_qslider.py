@@ -1,5 +1,5 @@
 from .qtcompat import QtGui
-from .qtcompat.QtCore import QEvent, QPoint, QRect, Qt, Signal
+from .qtcompat.QtCore import QEvent, QPoint, QPointF, QRect, Qt, Signal
 from .qtcompat.QtWidgets import (
     QAbstractSlider,
     QApplication,
@@ -53,7 +53,7 @@ class _GenericSlider(QSlider):
             self._position = value
             if self.isSliderDown():
                 self.sliderMoved.emit(self._position)  # type: ignore
-        self.sliderChange(QAbstractSlider.SliderValueChange)
+        self.sliderChange(QAbstractSlider.SliderChange.SliderValueChange)
         self.valueChanged.emit(value)  # type: ignore
 
     def sliderPosition(self) -> float:  # type: ignore
@@ -69,7 +69,7 @@ class _GenericSlider(QSlider):
         if self.isSliderDown():
             self.sliderMoved.emit(position)  # type: ignore
         if self.hasTracking() and not self._blocktracking:
-            self.triggerAction(QAbstractSlider.SliderMove)
+            self.triggerAction(QSlider.SliderMove)
 
     def singleStep(self) -> float:  # type: ignore
         return self._singleStep
@@ -88,7 +88,7 @@ class _GenericSlider(QSlider):
     def _setSteps(self, single: float, page: float):
         self._singleStep = single
         self._pageStep = page
-        self.sliderChange(QAbstractSlider.SliderStepsChange)
+        self.sliderChange(QSlider.SliderStepsChange)
 
     def minimum(self) -> float:  # type: ignore
         return self._minimum
@@ -103,12 +103,12 @@ class _GenericSlider(QSlider):
         self.setRange(min(self._minimum, max), max)
 
     def setRange(self, min: float, max_: float) -> None:
-        oldMin, self._minimum = self._minimum, min
-        oldMax, self._maximum = self._maximum, max(min, max_)
+        oldMin, self._minimum = self._minimum, float(min)
+        oldMax, self._maximum = self._maximum, float(max(min, max_))
 
         if oldMin != self._minimum or oldMax != self._maximum:
-            self.sliderChange(QAbstractSlider.SliderRangeChange)
-            self.rangeChanged.emit(self._minimum, self._maximum)  # type: ignore
+            self.sliderChange(self.SliderRangeChange)
+            self.rangeChanged.emit(self._minimum, self._maximum)
             self.setValue(self._value)  # re-bound
 
     def tickInterval(self) -> float:  # type: ignore
@@ -121,7 +121,7 @@ class _GenericSlider(QSlider):
     def triggerAction(self, action: QAbstractSlider.SliderAction) -> None:
         self._blocktracking = True
         # other actions here
-        self.actionTriggered.emit(action)
+        # self.actionTriggered.emit(action)
         self._blocktracking = False
         self.setValue(self._position)
 
@@ -152,19 +152,18 @@ class _GenericSlider(QSlider):
         option.minimum = 0
         option.maximum = _max
         _range = self._maximum - self._minimum
-        option.sliderPosition = (self._position - self._minimum) / _range * _max  # type: ignore
-        option.sliderValue = (self._value - self._minimum) / _range * _max  # type: ignore
-        option.tickInterval = self._tickInterval / _range * _max  # type: ignore
-        option.pageStep = self._pageStep / _range * _max  # type: ignore
-        option.singleStep = self._singleStep / _range * _max  # type: ignore
+        option.sliderPosition = int((self._position - self._minimum) / _range * _max)
+        option.sliderValue = int((self._value - self._minimum) / _range * _max)
+        option.tickInterval = int(self._tickInterval / _range * _max)
+        option.pageStep = int(self._pageStep / _range * _max)
+        option.singleStep = int(self._singleStep / _range * _max)
 
     def _bound(self, value: float) -> float:
         return max(self._minimum, min(self._maximum, value))
 
     def event(self, ev: QEvent) -> bool:
-        is_hover = ev.type() in (QEvent.HoverEnter, QEvent.HoverLeave, QEvent.HoverMove)
-        if is_hover and hasattr(ev, "pos"):
-            self._updateHoverControl(ev.pos())
+        if ev.type() in (QEvent.HoverEnter, QEvent.HoverLeave, QEvent.HoverMove):
+            self._updateHoverControl(_event_position(ev))
         return super().event(ev)
 
     def _updateHoverControl(self, pos: QPoint) -> bool:
@@ -217,6 +216,8 @@ class _GenericSlider(QSlider):
         # set_buttons = self.style().styleHint(QStyle.SH_Slider_AbsoluteSetButtons)
         set_buttons = Qt.LeftButton | Qt.MiddleButton
 
+        pos = _event_position(ev)
+
         # If the mouse button used is allowed to set the value
         if ev.buttons() & set_buttons == ev.button():
             opt = QStyleOptionSlider()
@@ -226,9 +227,8 @@ class _GenericSlider(QSlider):
                 QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self
             )
             center = sliderRect.center() - sliderRect.topLeft()
-            self.setSliderPosition(
-                self._pixelPosToRangeValue(self._pick(ev.pos() - center))
-            )
+
+            self.setSliderPosition(self._pixelPosToRangeValue(self._pick(pos - center)))
             self.triggerAction(QSlider.SliderMove)
             self.setRepeatAction(QSlider.SliderNoAction)
             self._pressedControl = QStyle.SC_SliderHandle
@@ -244,7 +244,7 @@ class _GenericSlider(QSlider):
             sr = self.style().subControlRect(
                 QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self
             )
-            self._clickOffset = self._pick(ev.pos() - sr.topLeft())
+            self._clickOffset = self._pick(pos - sr.topLeft())
             self.update(sr)
             self.setSliderDown(True)
 
@@ -255,7 +255,7 @@ class _GenericSlider(QSlider):
 
         ev.accept()
         newPosition = self._pixelPosToRangeValue(
-            self._pick(ev.pos()) - self._clickOffset
+            self._pick(_event_position(ev)) - self._clickOffset
         )
 
         self.setSliderPosition(newPosition)
@@ -266,7 +266,7 @@ class _GenericSlider(QSlider):
             return
 
         ev.accept()
-        oldPressed = QStyle.SubControl(self._pressedControl)
+        oldPressed = self._pressedControl
         self._pressedControl = QStyle.SubControl.SC_None
         self.setRepeatAction(QSlider.SliderNoAction)
         if oldPressed == QStyle.SubControl.SC_SliderHandle:
@@ -332,7 +332,7 @@ class _GenericSlider(QSlider):
             e.accept()
 
     def _scrollByDelta(self, orientation, modifiers, delta: int) -> bool:
-        steps_to_scroll = 0
+        steps_to_scroll = 0.0
         pg_step = self._pageStep
 
         # in Qt scrolling to the right gives negative values.
@@ -399,6 +399,15 @@ class _GenericSlider(QSlider):
         elif add < 0 and newValue > self._value:
             newValue = self._minimum
         return newValue
+
+
+def _event_position(ev: QEvent) -> QPoint:
+    # safe for Qt6, Qt5, and hoverEvent
+    evp = getattr(ev, "position", getattr(ev, "pos", None))
+    pos = evp() if evp else QPoint()
+    if isinstance(pos, QPointF):
+        pos = pos.toPoint()
+    return pos
 
 
 def _qbound(min_: float, max_: float, value: float) -> float:

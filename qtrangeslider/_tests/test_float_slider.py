@@ -71,6 +71,10 @@ def test_show(dslider: QDoubleSlider, qtbot):
     dslider.show()
 
 
+def _mouse_event(pos=QPointF(), type_=QEvent.MouseMove):
+    return QMouseEvent(type_, QPointF(pos), Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+
+
 def test_press_move_release(dslider: QDoubleSlider, qtbot, qapp):
     assert dslider._pressedControl == QStyle.SubControl.SC_None
 
@@ -84,20 +88,10 @@ def test_press_move_release(dslider: QDoubleSlider, qtbot, qapp):
         qtbot.mousePress(dslider, Qt.LeftButton, pos=handle_pos)
 
     assert dslider._pressedControl == QStyle.SubControl.SC_SliderHandle
-    # dslider.show()
-    # qapp.processEvents()
-    # dslider.hide()
 
     with qtbot.waitSignals([dslider.sliderMoved, dslider.valueChanged]):
         shift = QPoint(0, -8) if dslider.orientation() == Qt.Vertical else QPoint(8, 0)
-        ev = QMouseEvent(
-            QEvent.MouseMove,
-            handle_pos + shift,
-            Qt.LeftButton,
-            Qt.LeftButton,
-            Qt.NoModifier,
-        )
-        dslider.mouseMoveEvent(ev)
+        dslider.mouseMoveEvent(_mouse_event(handle_pos + shift))
 
     with qtbot.waitSignal(dslider.sliderReleased):
         qtbot.mouseRelease(dslider, Qt.LeftButton, pos=handle_pos)
@@ -115,7 +109,7 @@ def test_hover(dslider: QDoubleSlider):
     dslider.initStyleOption(opt)
     style = dslider.style()
     hrect = style.subControlRect(QStyle.CC_Slider, opt, QStyle.SC_SliderHandle)
-    handle_pos = dslider.mapToGlobal(hrect.center())
+    handle_pos = QPointF(dslider.mapToGlobal(hrect.center()))
 
     assert dslider._hoverControl == QStyle.SubControl.SC_None
 
@@ -126,37 +120,25 @@ def test_hover(dslider: QDoubleSlider):
     assert dslider._hoverControl == QStyle.SubControl.SC_None
 
 
-def test_wheel(dslider: QDoubleSlider, qtbot, qapp):
-    ev = QWheelEvent(
+def _wheel_event(arc):
+    return QWheelEvent(
         QPointF(),
         QPointF(),
-        QPoint(-120, -120),
-        QPoint(-120, -120),
-        12,
-        Qt.Vertical,
+        QPoint(arc, arc),
+        QPoint(arc, arc),
         Qt.NoButton,
         Qt.NoModifier,
         Qt.ScrollBegin,
         False,
         Qt.MouseEventSynthesizedByQt,
     )
-    with qtbot.waitSignal(dslider.valueChanged):
-        dslider.wheelEvent(ev)
 
-    ev = QWheelEvent(
-        QPointF(),
-        QPointF(),
-        QPoint(),
-        QPoint(),
-        12,
-        Qt.Vertical,
-        Qt.NoButton,
-        Qt.NoModifier,
-        Qt.ScrollUpdate,
-        False,
-        Qt.MouseEventSynthesizedByQt,
-    )
-    dslider.wheelEvent(ev)
+
+def test_wheel(dslider: QDoubleSlider, qtbot, qapp):
+    with qtbot.waitSignal(dslider.valueChanged):
+        dslider.wheelEvent(_wheel_event(120))
+
+    dslider.wheelEvent(_wheel_event(0))
 
 
 def test_position(dslider: QDoubleSlider, qtbot):
@@ -185,8 +167,7 @@ def _linspace(start, stop, n):
 
 
 @pytest.mark.parametrize("mag", list(range(4, 37, 4)) + list(range(-4, -37, -4)))
-def test_slider_extremes(dslider, mag, qtbot):
-    dslider.setRange(10, 20)
+def test_slider_extremes(dslider: QDoubleSlider, mag, qtbot):
     _mag = 10 ** mag
     with qtbot.waitSignal(dslider.rangeChanged):
         dslider.setRange(-_mag, _mag)
