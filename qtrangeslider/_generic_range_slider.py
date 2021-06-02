@@ -1,7 +1,7 @@
-from typing import List, Sequence, Tuple, Union
+from typing import Generic, List, Sequence, Tuple, TypeVar, Union
 
-from ._generic_qslider import CC_SLIDER, SC_GROOVE, SC_HANDLE, SC_NONE, _GenericSlider
-from ._style import RangeSliderStyle, update_styles_from_stylesheet
+from ._generic_slider import CC_SLIDER, SC_GROOVE, SC_HANDLE, SC_NONE, _GenericSlider
+from ._range_style import RangeSliderStyle, update_styles_from_stylesheet
 from .qtcompat import QtGui
 from .qtcompat.QtCore import (
     Property,
@@ -15,12 +15,13 @@ from .qtcompat.QtCore import (
 )
 from .qtcompat.QtWidgets import QSlider, QStyle, QStyleOptionSlider, QStylePainter
 
-ControlType = Tuple[str, int]
+_T = TypeVar("_T")
+
 
 SC_BAR = QStyle.SubControl.SC_ScrollBarSubPage
 
 
-class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
+class _GenericRangeSlider(_GenericSlider[Tuple], Generic[_T]):
     """MultiHandle Range Slider widget.
 
     Same API as QSlider, but `value`, `setValue`, `sliderPosition`, and
@@ -42,11 +43,11 @@ class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
         super().__init__(*args, **kwargs)
 
         # list of values
-        self._value: List[int] = [20, 80]
+        self._value: List[_T] = [20, 80]
 
         # list of current positions of each handle. same length as _value
         # If tracking is enabled (the default) this will be identical to _value
-        self._position: List[int] = [20, 80]
+        self._position: List[_T] = [20, 80]
 
         # which handle is being pressed/hovered
         self._pressedIndex = 0
@@ -60,23 +61,12 @@ class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
         self._should_draw_bar = True
 
         # color
+
         self._style = RangeSliderStyle()
         self.setStyleSheet("")
         update_styles_from_stylesheet(self)
 
-    # ###############  Public API  #######################
-
-    def setStyleSheet(self, styleSheet: str) -> None:
-        # sub-page styles render on top of the lower sliders and don't work here.
-        override = f"""
-            \n{type(self).__name__}::sub-page:horizontal {{background: none}}
-            \n{type(self).__name__}::sub-page:vertical {{background: none}}
-        """
-        return super().setStyleSheet(styleSheet + override)
-
-    def value(self) -> Tuple[int, ...]:
-        """Get current value of the widget as a tuple of integers."""
-        return tuple(self._value)
+    # ###############  New Public API  #######################
 
     def barIsRigid(self) -> bool:
         """Whether bar length is constant when dragging the bar.
@@ -114,14 +104,20 @@ class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
     def showBar(self) -> None:
         self.setBarVisible(True)
 
-    def sliderPosition(self) -> Tuple[int, ...]:
+    # ###############  QtOverrides  #######################
+
+    def value(self) -> Tuple[_T, ...]:
+        """Get current value of the widget as a tuple of integers."""
+        return tuple(self._value)
+
+    def sliderPosition(self):
         """Get current value of the widget as a tuple of integers.
 
         If tracking is enabled (the default) this will be identical to value().
         """
-        return tuple(self._position)
+        return tuple(float(i) for i in self._position)
 
-    def setSliderPosition(self, pos: Union[int, Sequence[int]], index=None) -> None:
+    def setSliderPosition(self, pos: Union[float, Sequence[float]], index=None) -> None:
         """Set current position of the handles with a sequence of integers.
 
         If `pos` is a sequence, it must have the same length as `value()`.
@@ -132,15 +128,38 @@ class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
             if len(pos) != val_len:
                 msg = f"'sliderPosition' must have same length as 'value()' ({val_len})"
                 raise ValueError(msg)
-
-            for idx, p in enumerate(pos):
-                self._position[idx] = self._bound(p, idx)
+            pairs = list(enumerate(pos))
         else:
-            idx = self._pressedIndex if index is None else index
-            self._position[idx] = self._bound(pos, idx)
-        self._updateSliderMove()
+            pairs = [(self._pressedIndex if index is None else index, pos)]
+
+        for idx, position in pairs:
+            self._position[idx] = self._bound(position, idx)
+
+        self._doSliderMove()
+
+    def setStyleSheet(self, styleSheet: str) -> None:
+        # sub-page styles render on top of the lower sliders and don't work here.
+        override = f"""
+            \n{type(self).__name__}::sub-page:horizontal {{background: none}}
+            \n{type(self).__name__}::sub-page:vertical {{background: none}}
+        """
+        return super().setStyleSheet(styleSheet + override)
+
+    def event(self, ev: QEvent) -> bool:
+        if ev.type() == QEvent.StyleChange:
+            update_styles_from_stylesheet(self)
+        return super().event(ev)
+
+    def mouseMoveEvent(self, ev: QtGui.QMouseEvent) -> None:
+        if self._pressedControl == SC_BAR:
+            ev.accept()
+            delta = self._clickOffset - self._pixelPosToRangeValue(self._pick(ev.pos()))
+            self._offsetAllPositions(-delta, self._sldPosAtPress)
+        else:
+            super().mouseMoveEvent(ev)
 
     # ###############  Implementation Details  #######################
+
     def _setPosition(self, val):
         self._position = list(val)
 
@@ -187,67 +206,7 @@ class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
     def _optSliderPositions(self):
         return [self._to_qinteger_space(p - self._minimum) for p in self._position]
 
-    def _drawBar(self, painter: QStylePainter, opt: QStyleOptionSlider):
-        brush = self._style.brush(opt)
-        r_bar = self._barRect(opt)
-        if isinstance(brush, QtGui.QGradient):
-            brush.setStart(r_bar.topLeft())
-            brush.setFinalStop(r_bar.bottomRight())
-        painter.setPen(self._style.pen(opt))
-        painter.setBrush(brush)
-        painter.drawRect(r_bar)
-
-    def _draw_handle(self, painter, opt):
-        if self._should_draw_bar:
-            self._drawBar(painter, opt)
-
-        opt.subControls = SC_HANDLE
-        hidx = -1
-        pidx = -1
-        if self._pressedControl and self._pressedControl == SC_HANDLE:
-            pidx = self._pressedIndex
-        else:
-            if self._hoverControl == SC_HANDLE:
-                hidx = self._hoverIndex
-        for idx, pos in enumerate(self._optSliderPositions):
-            opt.sliderPosition = pos
-            if idx == pidx:  # make pressed handles appear sunken
-                opt.state |= QStyle.State_Sunken
-            else:
-                opt.state = opt.state & ~QStyle.State_Sunken
-            opt.activeSubControls = SC_HANDLE if idx == hidx else SC_NONE
-            painter.drawComplexControl(CC_SLIDER, opt)
-
-    def event(self, ev: QEvent) -> bool:
-        if ev.type() == QEvent.StyleChange:
-            update_styles_from_stylesheet(self)
-        return super().event(ev)
-
-    def _updateHoverControl(self, pos):
-        old_hover = self._hoverControl, self._hoverIndex
-        self._hoverControl, self._hoverIndex = self._getControlAtPos(pos)
-        if (self._hoverControl, self._hoverIndex) != old_hover:
-            self.update()
-
-    def _updatePressedControl(self, pos):
-        opt = self._styleOption
-        self._pressedControl, self._pressedIndex = self._getControlAtPos(pos, opt)
-
-    def _setClickOffset(self, pos):
-        if self._pressedControl == SC_BAR:
-            self._clickOffset = self._pixelPosToRangeValue(self._pick(pos))
-            self._sldPosAtPress = tuple(self._position)
-        elif self._pressedControl == SC_HANDLE:
-            hr = self._handleRect(self._pressedIndex)
-            self._clickOffset = self._pick(pos - hr.topLeft())
-
-    def mouseMoveEvent(self, ev: QtGui.QMouseEvent) -> None:
-        if self._pressedControl == SC_BAR:
-            ev.accept()
-            delta = self._clickOffset - self._pixelPosToRangeValue(self._pick(ev.pos()))
-            self._offsetAllPositions(-delta, self._sldPosAtPress)
-        else:
-            super().mouseMoveEvent(ev)
+    # SubControl Positions
 
     def _handleRect(self, handle_index: int, opt: QStyleOptionSlider = None) -> QRect:
         """Return the QRect for all handles."""
@@ -277,7 +236,54 @@ class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
 
         return r_bar
 
-    # TODO: this is very much tied to mousepress... not a generic "get control"
+    # Painting
+
+    def _drawBar(self, painter: QStylePainter, opt: QStyleOptionSlider):
+        brush = self._style.brush(opt)
+        r_bar = self._barRect(opt)
+        if isinstance(brush, QtGui.QGradient):
+            brush.setStart(r_bar.topLeft())
+            brush.setFinalStop(r_bar.bottomRight())
+        painter.setPen(self._style.pen(opt))
+        painter.setBrush(brush)
+        painter.drawRect(r_bar)
+
+    def _draw_handle(self, painter: QStylePainter, opt: QStyleOptionSlider):
+        if self._should_draw_bar:
+            self._drawBar(painter, opt)
+
+        opt.subControls = SC_HANDLE
+        pidx = self._pressedIndex if self._pressedControl == SC_HANDLE else -1
+        hidx = self._hoverIndex if self._hoverControl == SC_HANDLE else -1
+        for idx, pos in enumerate(self._optSliderPositions):
+            opt.sliderPosition = pos
+            # make pressed handles appear sunken
+            if idx == pidx:
+                opt.state |= QStyle.State_Sunken
+            else:
+                opt.state = opt.state & ~QStyle.State_Sunken
+            opt.activeSubControls = SC_HANDLE if idx == hidx else SC_NONE
+            painter.drawComplexControl(CC_SLIDER, opt)
+
+    def _updateHoverControl(self, pos):
+        old_hover = self._hoverControl, self._hoverIndex
+        self._hoverControl, self._hoverIndex = self._getControlAtPos(pos)
+        if (self._hoverControl, self._hoverIndex) != old_hover:
+            self.update()
+
+    def _updatePressedControl(self, pos):
+        opt = self._styleOption
+        self._pressedControl, self._pressedIndex = self._getControlAtPos(pos, opt)
+
+    def _setClickOffset(self, pos):
+        if self._pressedControl == SC_BAR:
+            self._clickOffset = self._pixelPosToRangeValue(self._pick(pos))
+            self._sldPosAtPress = tuple(self._position)
+        elif self._pressedControl == SC_HANDLE:
+            hr = self._handleRect(self._pressedIndex)
+            self._clickOffset = self._pick(pos - hr.topLeft())
+
+    # NOTE: this is very much tied to mousepress... not a generic "get control"
     def _getControlAtPos(
         self, pos: QPoint, opt: QStyleOptionSlider = None
     ) -> Tuple[QStyle.SubControl, int]:
@@ -302,7 +308,6 @@ class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
                     return (SC_HANDLE, i - 1 if click_pos < avg else i)
                 # the click was below the minimum slider
                 return (SC_HANDLE, 0)
-
         # the click was above the maximum slider
         return (SC_HANDLE, len(self._position) - 1)
 
@@ -327,12 +332,3 @@ class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
             gain = 1 / gain
         center = abs(ref[-1] + ref[0]) / 2
         self.setSliderPosition([((i - center) * gain) + center for i in ref])
-
-
-# QRangeSlider.__doc__ += "\n" + textwrap.indent(QSlider.__doc__, "    ")
-
-
-class QDoubleRangeSlider(QRangeSlider):
-    def value(self) -> Tuple[int, ...]:
-        """Get current value of the widget as a tuple of integers."""
-        return tuple(float(v) for v in self._value)

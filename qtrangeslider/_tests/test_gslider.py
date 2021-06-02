@@ -1,7 +1,7 @@
 import pytest
 
 from qtrangeslider import QRangeSlider
-from qtrangeslider._generic_qslider import _GenericSlider
+from qtrangeslider._generic_slider import _GenericSlider
 from qtrangeslider.qtcompat.QtCore import QEvent, QPoint, QPointF, Qt
 from qtrangeslider.qtcompat.QtGui import QMouseEvent, QWheelEvent
 

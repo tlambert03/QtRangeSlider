@@ -5,6 +5,7 @@ from qtrangeslider.qtcompat.QtWidgets import QApplication
 app = QApplication([])
 
 slider = QRangeSlider(Qt.Horizontal)
+slider = QRangeSlider(Qt.Horizontal)
 
 slider.setValue((20, 80))
 slider.show()
