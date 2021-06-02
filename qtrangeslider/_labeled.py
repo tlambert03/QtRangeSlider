@@ -234,7 +234,8 @@ class QLabeledRangeSlider(SliderProxy, QAbstractSlider):
         labels_above = self._handle_label_position == LabelPosition.LabelsAbove
 
         last_edge = None
-        for label, rect in zip(self._handle_labels, self._slider._handleRects()):
+        for i, label in enumerate(self._handle_labels):
+            rect = self._slider._handleRect(i)
             dx = -label.width() / 2
             dy = -label.height() / 2
             if labels_above:
@@ -258,6 +259,7 @@ class QLabeledRangeSlider(SliderProxy, QAbstractSlider):
             label.move(pos)
             last_edge = pos
             label.clearFocus()
+        self.update()
 
     def _min_label_edited(self, val):
         if self._edge_label_mode == EdgeLabelMode.LabelIsRange:

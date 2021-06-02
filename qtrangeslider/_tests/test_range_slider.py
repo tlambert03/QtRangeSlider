@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from qtrangeslider import QRangeSlider
+from qtrangeslider import QDoubleRangeSlider, QRangeSlider
 from qtrangeslider.qtcompat.QtCore import QEvent, QPoint, QPointF, Qt
 from qtrangeslider.qtcompat.QtGui import QHoverEvent, QMouseEvent, QWheelEvent
 from qtrangeslider.qtcompat.QtWidgets import QStyle, QStyleOptionSlider
@@ -36,7 +36,7 @@ def _linspace(start, stop, n):
 
 @pytest.fixture(params=[Qt.Horizontal, Qt.Vertical])
 def gslider(qtbot, request):
-    slider = QRangeSlider(request.param)
+    slider = QDoubleRangeSlider(request.param)
     qtbot.addWidget(slider)
     assert slider.value() == (20, 80)
     assert slider.minimum() == 0

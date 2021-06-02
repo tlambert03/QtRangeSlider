@@ -164,10 +164,12 @@ class _GenericRangeSlider(_GenericSlider[Tuple], Generic[_T]):
         self._position = list(val)
 
     def _bound(self, value, index=None):
+        if isinstance(value, (list, tuple)):
+            return type(value)(self._bound(v) for v in value)
         pos = super()._bound(value)
         if index is not None:
             pos = self._neighbor_bound(pos, index)
-        return pos
+        return self._type_cast(pos)
 
     def _neighbor_bound(self, val, index):
         # make sure we don't go lower than any preceding index:

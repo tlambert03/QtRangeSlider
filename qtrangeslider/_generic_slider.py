@@ -249,13 +249,14 @@ class _GenericSlider(QSlider, Generic[_T]):
 
     # ###############  Implementation Details  #######################
 
+    def _type_cast(self, val):
+        return val
+
     def _setPosition(self, val):
         self._position = val
 
     def _bound(self, value: _T) -> _T:
-        if isinstance(value, (list, tuple)):
-            return type(value)(self._bound(v) for v in value)
-        return max(self._minimum, min(self._maximum, value))
+        return self._type_cast(max(self._minimum, min(self._maximum, value)))
 
     def _fixStyleOption(self, option):
         option.sliderPosition = self._to_qinteger_space(self._position - self._minimum)
