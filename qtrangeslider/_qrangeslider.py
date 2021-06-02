@@ -141,7 +141,6 @@ class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
         self._updateSliderMove()
 
     # ###############  Implementation Details  #######################
-
     def _setPosition(self, val):
         self._position = list(val)
 
@@ -162,7 +161,15 @@ class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
             val = min(_lst[index + 1] - min_dist, val)
         return val
 
-    def _offsetAllPositions(self, offset: int, ref=None) -> None:
+    def _getBarColor(self):
+        return self._style.brush(self._styleOption)
+
+    def _setBarColor(self, color):
+        self._style.brush_active = color
+
+    barColor = Property(QtGui.QBrush, _getBarColor, _setBarColor)
+
+    def _offsetAllPositions(self, offset: float, ref=None) -> None:
         if ref is None:
             ref = self._position
         if self._bar_is_rigid:
@@ -179,14 +186,6 @@ class QRangeSlider(_GenericSlider[Tuple[float, ...]]):
     @property
     def _optSliderPositions(self):
         return [self._to_qinteger_space(p - self._minimum) for p in self._position]
-
-    def _getBarColor(self):
-        return self._style.brush(self._styleOption)
-
-    def _setBarColor(self, color):
-        self._style.brush_active = color
-
-    barColor = Property(QtGui.QBrush, _getBarColor, _setBarColor)
 
     def _drawBar(self, painter: QStylePainter, opt: QStyleOptionSlider):
         brush = self._style.brush(opt)
