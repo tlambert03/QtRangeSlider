@@ -229,7 +229,6 @@ class _GenericSlider(QSlider, Generic[_T]):
         if e.inverted():
             delta *= -1
 
-        print("wheel", e.angleDelta(), delta)
         orientation = Qt.Vertical if vertical else Qt.Horizontal
         if self._scrollByDelta(orientation, e.modifiers(), delta):
             e.accept()
