@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.4.0
+    rev: v4.0.1
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
@@ -9,15 +9,15 @@ repos:
     hooks:
       - id: isort
   - repo: https://github.com/asottile/pyupgrade
-    rev: v2.13.0
+    rev: v2.19.0
     hooks:
       - id: pyupgrade
   - repo: https://github.com/psf/black
-    rev: 21.4b0
+    rev: 21.5b2
     hooks:
       - id: black
   - repo: https://github.com/PyCQA/flake8
-    rev: 3.9.1
+    rev: 3.9.2
     hooks:
       - id: flake8
         pass_filenames: true
