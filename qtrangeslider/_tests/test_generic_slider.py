@@ -4,34 +4,10 @@ import pytest
 
 from qtrangeslider._generic_slider import _GenericSlider
 from qtrangeslider.qtcompat.QtCore import QEvent, QPoint, QPointF, Qt
-from qtrangeslider.qtcompat.QtGui import QHoverEvent, QMouseEvent, QWheelEvent
+from qtrangeslider.qtcompat.QtGui import QHoverEvent
 from qtrangeslider.qtcompat.QtWidgets import QStyle, QStyleOptionSlider
 
-
-def _mouse_event(pos=QPointF(), type_=QEvent.MouseMove):
-    """Create a mouse event of `type_` at `pos`."""
-    return QMouseEvent(type_, QPointF(pos), Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
-
-
-def _wheel_event(arc):
-    """Create a wheel event with `arc`."""
-    return QWheelEvent(
-        QPointF(),
-        QPointF(),
-        QPoint(arc, arc),
-        QPoint(arc, arc),
-        Qt.NoButton,
-        Qt.NoModifier,
-        Qt.ScrollBegin,
-        False,
-        Qt.MouseEventSynthesizedByQt,
-    )
-
-
-def _linspace(start, stop, n):
-    h = (stop - start) / (n - 1)
-    for i in range(n):
-        yield start + h * i
+from ._testutil import _linspace, _mouse_event, _wheel_event
 
 
 @pytest.fixture(params=[Qt.Horizontal, Qt.Vertical])

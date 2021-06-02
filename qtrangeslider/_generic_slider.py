@@ -172,14 +172,11 @@ class _GenericSlider(QSlider, Generic[_T]):
             return
 
         ev.accept()
-        # FIXME: why not working on other styles?
-        # set_buttons = self.style().styleHint(QStyle.SH_Slider_AbsoluteSetButtons)
-        set_buttons = Qt.LeftButton | Qt.MiddleButton
 
         pos = _event_position(ev)
 
         # If the mouse button used is allowed to set the value
-        if ev.buttons() & set_buttons == ev.button():
+        if ev.button() in (Qt.LeftButton, Qt.MiddleButton):
             self._updatePressedControl(pos)
             if self._pressedControl == SC_HANDLE:
                 opt = self._styleOption
@@ -225,12 +222,14 @@ class _GenericSlider(QSlider, Generic[_T]):
         self.update()
 
     def wheelEvent(self, e: QtGui.QWheelEvent) -> None:
+
         e.ignore()
         vertical = bool(e.angleDelta().y())
         delta = e.angleDelta().y() if vertical else e.angleDelta().x()
         if e.inverted():
             delta *= -1
 
+        print("wheel", e.angleDelta(), delta)
         orientation = Qt.Vertical if vertical else Qt.Horizontal
         if self._scrollByDelta(orientation, e.modifiers(), delta):
             e.accept()

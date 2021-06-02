@@ -66,6 +66,15 @@ jobs:
           - python-version: 3.6
             platform: windows-2016
             backend: pyqt5
+
+          # legacy Qt
+          - python-version: 3.7
+            platform: ubuntu-latest
+            backend: pyqt511
+          - python-version: 3.7
+            platform: ubuntu-latest
+            backend: pyside511
+
     steps:
       - uses: actions/checkout@v2
 
