@@ -33,13 +33,19 @@ class EdgeLabelMode(IntEnum):
 
 
 class SliderProxy:
-    _slider: QAbstractSlider
+    _slider: QSlider
 
     def value(self):
         return self._slider.value()
 
     def setValue(self, value) -> None:
         self._slider.setValue(value)
+
+    def sliderPosition(self):
+        return self._slider.sliderPosition()
+
+    def setSliderPosition(self, pos) -> None:
+        self._slider.setSliderPosition(pos)
 
     def minimum(self):
         return self._slider.minimum()
@@ -67,6 +73,18 @@ class SliderProxy:
 
     def setRange(self, min, max) -> None:
         self._slider.setRange(min, max)
+
+    def tickInterval(self):
+        return self._slider.tickInterval()
+
+    def setTickInterval(self, interval) -> None:
+        self._slider.setTickInterval(interval)
+
+    def tickPosition(self):
+        return self._slider.tickPosition()
+
+    def setTickPosition(self, pos) -> None:
+        self._slider.setTickPosition(pos)
 
 
 def _handle_overloaded_slider_sig(args, kwargs):
