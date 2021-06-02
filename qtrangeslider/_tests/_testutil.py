@@ -1,7 +1,21 @@
 from contextlib import suppress
+from distutils.version import LooseVersion
+from platform import system
 
+import pytest
+
+from qtrangeslider.qtcompat import QT_VERSION
 from qtrangeslider.qtcompat.QtCore import QEvent, QPoint, QPointF, Qt
 from qtrangeslider.qtcompat.QtGui import QMouseEvent, QWheelEvent
+
+QT_VERSION = LooseVersion(QT_VERSION)
+
+SYS_DARWIN = system() == "Darwin"
+
+skip_on_linux_qt6 = pytest.mark.skipif(
+    system() == "Linux" and QT_VERSION >= LooseVersion("6.0"),
+    reason="hover events not working on linux pyqt6",
+)
 
 
 def _mouse_event(pos=QPointF(), type_=QEvent.MouseMove):

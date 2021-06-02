@@ -1,18 +1,23 @@
 import math
 from contextlib import suppress
 from distutils.version import LooseVersion
-from platform import system
 
 import pytest
 
 from qtrangeslider import QDoubleSlider, QLabeledDoubleSlider, QLabeledSlider
 from qtrangeslider._generic_slider import _GenericSlider
-from qtrangeslider.qtcompat import QT_VERSION
 from qtrangeslider.qtcompat.QtCore import QEvent, QPoint, QPointF, Qt
 from qtrangeslider.qtcompat.QtGui import QHoverEvent
 from qtrangeslider.qtcompat.QtWidgets import QSlider, QStyle, QStyleOptionSlider
 
-from ._testutil import _linspace, _mouse_event, _wheel_event
+from ._testutil import (
+    QT_VERSION,
+    SYS_DARWIN,
+    _linspace,
+    _mouse_event,
+    _wheel_event,
+    skip_on_linux_qt6,
+)
 
 
 @pytest.fixture(params=[Qt.Horizontal, Qt.Vertical], ids=["horizontal", "vertical"])
@@ -97,7 +102,7 @@ def test_ticks(sld: _GenericSlider, qtbot):
 
 
 # FIXME: this isn't testing labeled sliders as it needs to be ...
-@pytest.mark.skipif(system() != "Darwin", reason="mousePress only working on mac")
+@pytest.mark.skipif(not SYS_DARWIN, reason="mousePress only working on mac")
 def test_press_move_release(sld: _GenericSlider, qtbot):
 
     _real_sld = getattr(sld, "_slider", sld)
@@ -136,6 +141,7 @@ def test_press_move_release(sld: _GenericSlider, qtbot):
         qtbot.mousePress(_real_sld, Qt.LeftButton, pos=handle_pos)
 
 
+@skip_on_linux_qt6
 def test_hover(sld: _GenericSlider):
 
     _real_sld = getattr(sld, "_slider", sld)
@@ -161,7 +167,7 @@ def test_hover(sld: _GenericSlider):
 
 def test_wheel(sld: _GenericSlider, qtbot):
 
-    if type(sld) is QLabeledSlider and LooseVersion(QT_VERSION) < LooseVersion("5.12"):
+    if type(sld) is QLabeledSlider and QT_VERSION < LooseVersion("5.12"):
         pytest.skip()
 
     _real_sld = getattr(sld, "_slider", sld)

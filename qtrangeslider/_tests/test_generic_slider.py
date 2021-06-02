@@ -7,7 +7,7 @@ from qtrangeslider.qtcompat.QtCore import QEvent, QPoint, QPointF, Qt
 from qtrangeslider.qtcompat.QtGui import QHoverEvent
 from qtrangeslider.qtcompat.QtWidgets import QStyle, QStyleOptionSlider
 
-from ._testutil import _linspace, _mouse_event, _wheel_event
+from ._testutil import _linspace, _mouse_event, _wheel_event, skip_on_linux_qt6
 
 
 @pytest.fixture(params=[Qt.Horizontal, Qt.Vertical])
@@ -102,6 +102,7 @@ def test_press_move_release(gslider: _GenericSlider, qtbot):
         qtbot.mousePress(gslider, Qt.LeftButton, pos=handle_pos)
 
 
+@skip_on_linux_qt6
 def test_hover(gslider: _GenericSlider):
 
     opt = QStyleOptionSlider()
