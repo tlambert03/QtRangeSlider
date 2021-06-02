@@ -3,7 +3,6 @@ try:
 except ImportError:
     __version__ = "unknown"
 
-# from ._float_slider import QDoubleRangeSlider, QDoubleSlider
 from ._generic_qslider import QDoubleSlider
 from ._labeled import (
     QLabeledDoubleRangeSlider,
@@ -11,7 +10,7 @@ from ._labeled import (
     QLabeledRangeSlider,
     QLabeledSlider,
 )
-from ._qrangeslider import QRangeSlider
+from ._qrangeslider import QDoubleRangeSlider, QRangeSlider
 
 __all__ = [
     "QDoubleRangeSlider",

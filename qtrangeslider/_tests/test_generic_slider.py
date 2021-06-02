@@ -41,7 +41,8 @@ def gslider(qtbot, request):
     assert slider.value() == 0
     assert slider.minimum() == 0
     assert slider.maximum() == 99
-    return slider
+    yield slider
+    slider.initStyleOption(QStyleOptionSlider())
 
 
 def test_change_floatslider_range(gslider: _GenericSlider, qtbot):
@@ -176,3 +177,4 @@ def test_slider_extremes(gslider: _GenericSlider, mag, qtbot):
     for i in _linspace(-_mag, _mag, 10):
         gslider.setValue(i)
         assert math.isclose(gslider.value(), i, rel_tol=1e-8)
+        gslider.initStyleOption(QStyleOptionSlider())

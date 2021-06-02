@@ -41,7 +41,8 @@ def gslider(qtbot, request):
     assert slider.value() == (20, 80)
     assert slider.minimum() == 0
     assert slider.maximum() == 99
-    return slider
+    yield slider
+    slider.initStyleOption(QStyleOptionSlider())
 
 
 def test_change_floatslider_range(gslider: QRangeSlider, qtbot):
@@ -115,6 +116,7 @@ def test_slider_extremes(gslider: QRangeSlider, mag, qtbot):
     for i in _linspace(-_mag, _mag, 10):
         gslider.setValue((i, _mag))
         assert math.isclose(gslider.value()[0], i, rel_tol=1e-8)
+        gslider.initStyleOption(QStyleOptionSlider())
 
 
 def test_ticks(gslider: QRangeSlider, qtbot):
@@ -158,9 +160,9 @@ def test_press_move_release(gslider: QRangeSlider, qtbot):
 
 def test_hover(gslider: QRangeSlider):
 
-    hrect = gslider._handleRects(handle_index=0)
+    hrect = gslider._handleRect(0)
     handle_pos = QPointF(gslider.mapToGlobal(hrect.center()))
-    print(handle_pos)
+
     assert gslider._hoverControl == QStyle.SubControl.SC_None
 
     gslider.event(QHoverEvent(QEvent.HoverEnter, handle_pos, QPointF()))

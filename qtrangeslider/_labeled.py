@@ -1,8 +1,8 @@
 from enum import IntEnum
 from functools import partial
 
-from ._generic_qslider import QDoubleRangeSlider, QDoubleSlider
-from ._qrangeslider import QRangeSlider
+from ._generic_qslider import QDoubleSlider
+from ._qrangeslider import QDoubleRangeSlider, QRangeSlider
 from .qtcompat.QtCore import QPoint, QSize, Qt, Signal
 from .qtcompat.QtGui import QFontMetrics, QValidator
 from .qtcompat.QtWidgets import (
@@ -289,7 +289,7 @@ class QLabeledRangeSlider(SliderProxy, QAbstractSlider):
                 lbl.deleteLater()
             self._handle_labels.clear()
             for n, val in enumerate(self._slider.value()):
-                _cb = partial(self._slider._setSliderPositionAt, n)
+                _cb = partial(self._slider.setSliderPosition, index=n)
                 s = SliderLabel(self._slider, parent=self, connect=_cb)
                 s.setValue(val)
                 self._handle_labels.append(s)

@@ -1,4 +1,4 @@
-from typing import TypeVar
+from typing import Generic, TypeVar
 
 from .qtcompat import QtGui
 from .qtcompat.QtCore import QEvent, QPoint, QPointF, QRect, Qt, Signal
@@ -18,9 +18,11 @@ SC_HANDLE = QStyle.SubControl.SC_SliderHandle
 SC_GROOVE = QStyle.SubControl.SC_SliderGroove
 SC_TICKMARKS = QStyle.SubControl.SC_SliderTickmarks
 CC_SLIDER = QStyle.ComplexControl.CC_Slider
+MAX_DISPLAY = 5000
+QOVERFLOW = 2 ** 31 - 1
 
 
-class _GenericSlider(QSlider):
+class _GenericSlider(QSlider, Generic[_T]):
     valueChanged = Signal(float)
     sliderMoved = Signal(float)
     rangeChanged = Signal(float, float)
@@ -30,8 +32,8 @@ class _GenericSlider(QSlider):
         self._minimum = 0.0
         self._maximum = 99.0
         self._pageStep = 10.0
-        self._value = 0.0
-        self._position = 0.0
+        self._value: _T = 0.0  # type: ignore
+        self._position: _T = 0.0
         self._singleStep = 1.0
         self._offsetAccumulated = 0.0
         self._blocktracking = False
@@ -51,10 +53,10 @@ class _GenericSlider(QSlider):
         super().__init__(*args, **kwargs)
         self.setAttribute(Qt.WA_Hover)
 
-    def value(self) -> float:  # type: ignore
+    def value(self) -> _T:  # type: ignore
         return self._value
 
-    def setValue(self, value: float) -> None:
+    def setValue(self, value: _T) -> None:
         value = self._bound(value)
         if self._value == value and self._position == value:
             return
@@ -69,10 +71,10 @@ class _GenericSlider(QSlider):
     def _setPosition(self, val):
         self._position = val
 
-    def sliderPosition(self) -> float:  # type: ignore
+    def sliderPosition(self) -> _T:  # type: ignore
         return self._position
 
-    def setSliderPosition(self, pos: float) -> None:
+    def setSliderPosition(self, pos: _T) -> None:
         position = self._bound(pos)
         if position == self._position:
             return
@@ -141,10 +143,13 @@ class _GenericSlider(QSlider):
         self._blocktracking = False
         self.setValue(self._position)
 
-    def initStyleOption(self, option: QStyleOptionSlider) -> None:
-        if not option:
-            return
+    @property
+    def _styleOption(self):
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        return opt
 
+    def initStyleOption(self, option: QStyleOptionSlider) -> None:
         option.initFrom(self)
         option.subControls = SC_NONE
         option.activeSubControls = SC_NONE
@@ -160,19 +165,22 @@ class _GenericSlider(QSlider):
         # option.singleStep = self._singleStep  # type: ignore
         if self.orientation() == Qt.Horizontal:
             option.state |= QStyle.State_Horizontal
+
+        # scale style option to integer space
+        _max = MAX_DISPLAY
+        option.minimum = 0
+        option.maximum = _max
+        option.tickInterval = self._to_qinteger_space(self._tickInterval)
+        option.pageStep = self._to_qinteger_space(self._pageStep)
+        option.singleStep = self._to_qinteger_space(self._singleStep)
         self._fixStyleOption(option)
 
     def _fixStyleOption(self, option):
-        # scale style option to integer space
-        _max = 10000
-        option.minimum = 0
-        option.maximum = _max
-        _range = self._maximum - self._minimum
-        option.sliderPosition = int((self._position - self._minimum) / _range * _max)
-        option.sliderValue = int((self._value - self._minimum) / _range * _max)
-        option.tickInterval = int(self._tickInterval / _range * _max)
-        option.pageStep = int(self._pageStep / _range * _max)
-        option.singleStep = int(self._singleStep / _range * _max)
+        option.sliderPosition = self._to_qinteger_space(self._position - self._minimum)
+        option.sliderValue = self._to_qinteger_space(self._value - self._minimum)
+
+    def _to_qinteger_space(self, val, _max=MAX_DISPLAY):
+        return int(min(QOVERFLOW, val / (self._maximum - self._minimum) * _max))
 
     def _bound(self, value: _T) -> _T:
         if isinstance(value, (list, tuple)):
@@ -201,8 +209,7 @@ class _GenericSlider(QSlider):
         return not doesHover
 
     def _newHoverControl(self, pos: QPoint) -> QStyle.SubControl:
-        opt = QStyleOptionSlider()
-        self.initStyleOption(opt)
+        opt = self._styleOption
         opt.subControls = QStyle.SubControl.SC_All
 
         handleRect = self.style().subControlRect(CC_SLIDER, opt, SC_HANDLE, self)
@@ -239,8 +246,7 @@ class _GenericSlider(QSlider):
         if ev.buttons() & set_buttons == ev.button():
             self._updatePressedControl(pos)
             if self._pressedControl == SC_HANDLE:
-                opt = QStyleOptionSlider()
-                self.initStyleOption(opt)
+                opt = self._styleOption
                 sr = self.style().subControlRect(CC_SLIDER, opt, SC_HANDLE, self)
                 offset = sr.center() - sr.topLeft()
                 new_pos = self._pixelPosToRangeValue(self._pick(pos - offset))
@@ -260,9 +266,7 @@ class _GenericSlider(QSlider):
             self.setSliderDown(True)
 
     def _setClickOffset(self, pos: QPoint):
-        opt = QStyleOptionSlider()
-        self.initStyleOption(opt)
-        hr = self.style().subControlRect(CC_SLIDER, opt, SC_HANDLE, self)
+        hr = self.style().subControlRect(CC_SLIDER, self._styleOption, SC_HANDLE, self)
         self._clickOffset = self._pick(pos - hr.topLeft())
 
     def _updatePressedControl(self, pos: QPoint):
@@ -292,28 +296,33 @@ class _GenericSlider(QSlider):
         self.update()
 
     def paintEvent(self, ev: QtGui.QPaintEvent) -> None:
-        p = QStylePainter(self)
-        opt = QStyleOptionSlider()
-        self.initStyleOption(opt)
+        painter = QStylePainter(self)
+        opt = self._styleOption
 
-        opt.subControls = SC_GROOVE | SC_HANDLE
+        # draw groove and ticks
+        opt.subControls = SC_GROOVE
         if opt.tickPosition != QSlider.NoTicks:
             opt.subControls |= SC_TICKMARKS
+        painter.drawComplexControl(CC_SLIDER, opt)
+
+        self._draw_handle(painter, opt)
+
+    def _draw_handle(self, painter, opt):
+        opt.subControls = SC_HANDLE
         if self._pressedControl:
             opt.activeSubControls = self._pressedControl
             opt.state |= QStyle.State_Sunken
         else:
             opt.activeSubControls = self._hoverControl
 
-        p.drawComplexControl(CC_SLIDER, opt)
+        painter.drawComplexControl(CC_SLIDER, opt)
 
     def _pick(self, pt: QPoint) -> int:
         return pt.x() if self.orientation() == Qt.Horizontal else pt.y()
 
     # from QSliderPrivate.pixelPosToRangeValue
     def _pixelPosToRangeValue(self, pos: int) -> float:
-        opt = QStyleOptionSlider()
-        self.initStyleOption(opt)
+        opt = self._styleOption
 
         gr = self.style().subControlRect(CC_SLIDER, opt, SC_GROOVE, self)
         sr = self.style().subControlRect(CC_SLIDER, opt, SC_HANDLE, self)
@@ -384,9 +393,7 @@ class _GenericSlider(QSlider):
                 effective_offset = self._offset_accum
                 if self.invertedControls():
                     effective_offset *= -1
-                if effective_offset > 0 and self._value < self._maximum:
-                    return True
-                if effective_offset < 0 and self._value < self._minimum:
+                if self._has_scroll_space_left(effective_offset):
                     return True
                 self._offset_accum = 0
                 return False
@@ -395,13 +402,20 @@ class _GenericSlider(QSlider):
             steps_to_scroll *= -1
 
         prevValue = self._value
-        self._setPosition(self._bound(self._overflowSafeAdd(steps_to_scroll)))
-        self.triggerAction(QSlider.SliderMove)
-
+        self._execute_scroll(steps_to_scroll, modifiers)
         if prevValue == self._value:
             self._offset_accum = 0
             return False
         return True
+
+    def _has_scroll_space_left(self, offset):
+        return (offset > 0 and self._value < self._maximum) or (
+            offset < 0 and self._value < self._minimum
+        )
+
+    def _execute_scroll(self, steps_to_scroll, modifiers):
+        self._setPosition(self._bound(self._overflowSafeAdd(steps_to_scroll)))
+        self.triggerAction(QSlider.SliderMove)
 
     def _effectiveSingleStep(self) -> float:
         return self._singleStep * self._repeatMultiplier
@@ -413,6 +427,9 @@ class _GenericSlider(QSlider):
         elif add < 0 and newValue > self._value:
             newValue = self._minimum
         return newValue
+
+    # def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
+    #     return  # TODO
 
 
 def _event_position(ev: QEvent) -> QPoint:
@@ -433,6 +450,7 @@ def _sliderValueFromPosition(
     min: float, max: float, position: int, span: int, upsideDown: bool = False
 ) -> float:
     """Converts the given pixel `position` to a value.
+
     0 maps to the `min` parameter, `span` maps to `max` and other values are
     distributed evenly in-between.
 
@@ -450,18 +468,17 @@ def _sliderValueFromPosition(
     return max - tmp if upsideDown else tmp + min
 
 
-class QDoubleSlider(_GenericSlider):
-    pass
+class QDoubleSlider(_GenericSlider[float]):
+    def value(self):
+        return float(self._value)
 
 
-class QDoubleRangeSlider:
-    pass
+# mostly just an example... use QSlider instead.
+class QIntSlider(_GenericSlider[int]):
+    valueChanged = Signal(int)
 
+    def value(self):
+        return int(round(self._value))
 
-# class QDoubleRangeSlider(QRangeSlider, _GenericSlider):
-
-#     rangeChanged = Signal(float, float)
-
-#     def value(self):
-#         """Get current value of the widget as a tuple of integers."""
-#         return tuple(float(i) for i in self._value)
+    def _bound(self, value) -> int:
+        return int(round(super()._bound(value)))
