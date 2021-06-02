@@ -1,6 +1,7 @@
 import math
 from contextlib import suppress
 from distutils.version import LooseVersion
+from platform import system
 
 import pytest
 
@@ -96,6 +97,7 @@ def test_ticks(sld: _GenericSlider, qtbot):
 
 
 # FIXME: this isn't testing labeled sliders as it needs to be ...
+@pytest.mark.skipif(system() != "Darwin", reason="mousePress only working on mac")
 def test_press_move_release(sld: _GenericSlider, qtbot):
 
     _real_sld = getattr(sld, "_slider", sld)
