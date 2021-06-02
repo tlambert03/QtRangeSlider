@@ -18,6 +18,26 @@ def test_basic(qtbot, orientation):
     qtbot.addWidget(rs)
 
 
+@pytest.mark.parametrize("orientation", ["Horizontal", "Vertical"])
+def test_value(qtbot, orientation):
+    rs = QRangeSlider(getattr(Qt, orientation))
+    qtbot.addWidget(rs)
+    rs.setValue([10, 20])
+    assert rs.value() == (10, 20)
+
+
+@pytest.mark.parametrize("orientation", ["Horizontal", "Vertical"])
+def test_range(qtbot, orientation):
+    rs = QRangeSlider(getattr(Qt, orientation))
+    qtbot.addWidget(rs)
+    rs.setValue([10, 20])
+    assert rs.value() == (10, 20)
+    rs.setRange(15, 20)
+    assert rs.value() == (15, 20)
+    assert rs.minimum() == 15
+    assert rs.maximum() == 20
+
+
 @skipmouse
 def test_drag_handles(qtbot):
     rs = QRangeSlider(Qt.Horizontal)

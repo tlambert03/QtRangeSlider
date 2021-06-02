@@ -1,8 +1,14 @@
 import textwrap
-from collections import abc
-from typing import List, Sequence, Tuple
+from typing import List, Sequence, Tuple, Union
 
-from ._generic_qslider import _GenericSlider
+from ._generic_qslider import (
+    CC_SLIDER,
+    SC_GROOVE,
+    SC_HANDLE,
+    SC_NONE,
+    SC_TICKMARKS,
+    _GenericSlider,
+)
 from ._style import RangeSliderStyle, update_styles_from_stylesheet
 from .qtcompat import QtGui
 from .qtcompat.QtCore import (
@@ -25,6 +31,8 @@ from .qtcompat.QtWidgets import (
 
 ControlType = Tuple[str, int]
 
+SC_BAR = QStyle.SubControl.SC_ScrollBarSubPage
+
 
 class QRangeSlider(_GenericSlider):
     """MultiHandle Range Slider widget.
@@ -44,8 +52,6 @@ class QRangeSlider(_GenericSlider):
     # The value is the positions of *all* handles.
     sliderMoved = Signal(tuple)
 
-    _NULL_CTRL = ("None", -1)
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -55,8 +61,10 @@ class QRangeSlider(_GenericSlider):
         # list of current positions of each handle. same length as _value
         # If tracking is enabled (the default) this will be identical to _value
         self._position: List[int] = [20, 80]
-        self._pressedControl: ControlType = self._NULL_CTRL
-        self._hoverControl: ControlType = self._NULL_CTRL
+
+        # which handle is being pressed/hovered
+        self._pressedIndex = 0
+        self._hoverIndex = 0
 
         # whether bar length is constant when dragging the bar
         # if False, the bar can shorten when dragged beyond min/max
@@ -64,13 +72,6 @@ class QRangeSlider(_GenericSlider):
         # whether clicking on the bar moves all handles, or just the nearest handle
         self._bar_moves_all = True
         self._should_draw_bar = True
-
-        # for keyboard nav
-        self._repeatMultiplier = 1  # TODO
-        # for wheel nav
-        self._offset_accum = 0
-        # fraction of total range to scroll when holding Ctrl while scrolling
-        self._control_fraction = 0.04
 
         # color
         self._style = RangeSliderStyle()
@@ -91,45 +92,24 @@ class QRangeSlider(_GenericSlider):
         """Get current value of the widget as a tuple of integers."""
         return tuple(self._value)
 
-    def setValue(self, val: Sequence[int]) -> None:
-        """Set current value of the widget with a sequence of integers.
+    # def setValue(self, val: Sequence[int]) -> None:
+    #     """Set current value of the widget with a sequence of integers.
 
-        The number of handles will be equal to the length of the sequence
-        """
-        if not (isinstance(val, abc.Sequence) and len(val) >= 2):
-            raise ValueError("value must be iterable of len >= 2")
-        val = [self._min_max_bound(v) for v in val]
-        if self._value == val and self._position == val:
-            return
-        self._value[:] = val[:]
-        if self._position != val:
-            self._position = val
-            if self.isSliderDown():
-                self.sliderMoved.emit(tuple(self._position))
+    #     The number of handles will be equal to the length of the sequence
+    #     """
+    #     if not (isinstance(val, abc.Sequence) and len(val) >= 2):
+    #         raise ValueError("value must be iterable of len >= 2")
+    #     val = [self._bound(v) for v in val]
+    #     if self._value == val and self._position == val:
+    #         return
+    #     self._value[:] = val[:]
+    #     if self._position != val:
+    #         self._position = val
+    #         if self.isSliderDown():
+    #             self.sliderMoved.emit(tuple(self._position))
 
-        self.sliderChange(QSlider.SliderValueChange)
-        self.valueChanged.emit(self.value())
-
-    def sliderPosition(self) -> Tuple[int, ...]:
-        """Get current value of the widget as a tuple of integers.
-
-        If tracking is enabled (the default) this will be identical to value().
-        """
-        return tuple(self._position)
-
-    def setSliderPosition(self, val: Sequence[int]) -> None:
-        """Set current position of the handles with a sequence of integers.
-
-        The sequence must have the same length as `value()`.
-        """
-        if len(val) != len(self.value()):
-            raise ValueError(
-                f"'sliderPosition' must have length of 'value()' ({len(self.value())})"
-            )
-
-        for i, v in enumerate(val):
-            self._setSliderPositionAt(i, v, _update=False)
-        self._updateSliderMove()
+    #     self.sliderChange(QSlider.SliderValueChange)
+    #     self.valueChanged.emit(self.value())
 
     def barIsRigid(self) -> bool:
         """Whether bar length is constant when dragging the bar.
@@ -167,26 +147,53 @@ class QRangeSlider(_GenericSlider):
     def showBar(self) -> None:
         self.setBarVisible(True)
 
+    def sliderPosition(self) -> Tuple[int, ...]:
+        """Get current value of the widget as a tuple of integers.
+
+        If tracking is enabled (the default) this will be identical to value().
+        """
+        return tuple(self._position)
+
+    def setSliderPosition(self, pos: Union[int, Sequence[int]], index=None) -> None:
+        """Set current position of the handles with a sequence of integers.
+
+        If `pos` is a sequence, it must have the same length as `value()`.
+        If it is a scalar, index will be
+        """
+        if isinstance(pos, (list, tuple)):
+            val_len = len(self.value())
+            if len(pos) != val_len:
+                msg = f"'sliderPosition' must have same length as 'value()' ({val_len})"
+                raise ValueError(msg)
+
+            for idx, p in enumerate(pos):
+                self._position[idx] = self._bound(p, idx)
+        else:
+            idx = self._pressedIndex if index is None else index
+            self._position[idx] = self._bound(pos, idx)
+        self._updateSliderMove()
+
     # ###############  Implementation Details  #######################
 
-    def _setSliderPositionAt(self, index: int, pos: int, _update=True) -> None:
-        pos = self._min_max_bound(pos)
-        # prevent sliders from moving beyond their neighbors
-        pos = self._neighbor_bound(pos, index, self._position)
-        if pos == self._position[index]:
-            return
+    def _setPosition(self, val):
+        self._position = list(val)
 
-        self._position[index] = pos
-        if _update:
-            self._updateSliderMove()
+    def _bound(self, value, index=None):
+        pos = super()._bound(value)
+        if index is not None:
+            pos = self._neighbor_bound(pos, index)
+        return pos
 
-    def _updateSliderMove(self):
-        if not self.hasTracking():
-            self.update()
-        if self.isSliderDown():
-            self.sliderMoved.emit(tuple(self._position))
-        if self.hasTracking():
-            self.triggerAction(QSlider.SliderMove)
+    def _neighbor_bound(self, val, index):
+        # make sure we don't go lower than any preceding index:
+        min_dist = self.singleStep()
+        _lst = self._position
+        if index > 0:
+            val = max(_lst[index - 1] + min_dist, val)
+        # make sure we don't go higher than any following index:
+        if index < (len(_lst) - 1):
+            val = min(_lst[index + 1] - min_dist, val)
+        return val
 
     def _offsetAllPositions(self, offset: int, ref=None) -> None:
         if ref is None:
@@ -218,8 +225,8 @@ class QRangeSlider(_GenericSlider):
         opt.sliderValue = 0
         opt.sliderPosition = 0
 
-        opt.minimum = self._minimum
-        opt.maximum = self._maximum
+        opt.minimum = int(self._minimum)
+        opt.maximum = int(self._maximum)
         # opt.tickInterval = self._tickInterval / _range * _max  # type: ignore
         # opt.pageStep = self._pageStep / _range * _max  # type: ignore
         # opt.singleStep = self._singleStep / _range * _max  # type: ignore
@@ -252,120 +259,60 @@ class QRangeSlider(_GenericSlider):
         opt = self._getStyleOption()
 
         # draw groove and ticks
-        opt.subControls = QStyle.SC_SliderGroove | QStyle.SC_SliderTickmarks
-        painter.drawComplexControl(QStyle.CC_Slider, opt)
+        opt.subControls = SC_GROOVE | SC_TICKMARKS
+        painter.drawComplexControl(CC_SLIDER, opt)
 
         if self._should_draw_bar:
             self._drawBar(painter, opt)
 
         # draw handles
-        opt.subControls = QStyle.SC_SliderHandle
+        opt.subControls = SC_HANDLE
         hidx = -1
         pidx = -1
-        if self._pressedControl and self._pressedControl[0] == "handle":
-            pidx = self._pressedControl[1]
+        if self._pressedControl and self._pressedControl == SC_HANDLE:
+            pidx = self._pressedIndex
         else:
-            try:
-                if self._hoverControl[0] == "handle":
-                    hidx = self._hoverControl[1]
-            except TypeError:
-                pass
+            if self._hoverControl == SC_HANDLE:
+                hidx = self._hoverIndex
         for idx, pos in enumerate(self._position):
-            opt.sliderPosition = pos
-            print(opt.sliderPosition, opt.maximum)
+            opt.sliderPosition = int(pos)
             if idx == pidx:  # make pressed handles appear sunken
                 opt.state |= QStyle.State_Sunken
             else:
                 opt.state = opt.state & ~QStyle.State_Sunken
-            if idx == hidx:
-                opt.activeSubControls = QStyle.SC_SliderHandle
-            else:
-                opt.activeSubControls = QStyle.SC_None
-            painter.drawComplexControl(QStyle.CC_Slider, opt)
+            opt.activeSubControls = SC_HANDLE if idx == hidx else SC_NONE
+            painter.drawComplexControl(CC_SLIDER, opt)
 
     def event(self, ev: QEvent) -> bool:
-        if ev.type() == QEvent.WindowActivate:
-            self.update()
         if ev.type() == QEvent.StyleChange:
             update_styles_from_stylesheet(self)
-        if ev.type() in (QEvent.HoverEnter, QEvent.HoverLeave, QEvent.HoverMove):
-            old_hover = self._hoverControl
-            self._hoverControl = self._getControlAtPos(ev.pos())
-            if self._hoverControl != old_hover:
-                self.update()  # TODO: restrict to the rect of old_hover
         return super().event(ev)
 
-    def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
-        if self.minimum() == self.maximum() or ev.buttons() ^ ev.button():
-            ev.ignore()
-            return
-
-        ev.accept()
-        # FIXME: why not working on other styles?
-        # set_buttons = self.style().styleHint(QStyle.SH_Slider_AbsoluteSetButtons)
-        set_buttons = Qt.LeftButton | Qt.MiddleButton
-
-        # If the mouse button used is allowed to set the value
-        if ev.buttons() & set_buttons == ev.button():
-            opt = self._getStyleOption()
-
-            self._pressedControl = self._getControlAtPos(ev.pos(), opt, True)
-
-            if self._pressedControl[0] == "handle":
-                offset = self._handle_offset(opt)
-                new_pos = self._pixelPosToRangeValue(self._pick(ev.pos() - offset))
-                self._setSliderPositionAt(self._pressedControl[1], new_pos)
-                self.triggerAction(QSlider.SliderMove)
-                self.setRepeatAction(QSlider.SliderNoAction)
+    def _updateHoverControl(self, pos):
+        old_hover = self._hoverControl, self._hoverIndex
+        self._hoverControl, self._hoverIndex = self._getControlAtPos(pos)
+        if (self._hoverControl, self._hoverIndex) != old_hover:
             self.update()
 
-        if self._pressedControl[0] == "handle":
-            self.setRepeatAction(QSlider.SliderNoAction)  # why again?
-            sr = self._handleRects(opt, self._pressedControl[1])
-            self._clickOffset = self._pick(ev.pos() - sr.topLeft())
-            self.update()
-            self.setSliderDown(True)
-        elif self._pressedControl[0] == "bar":
-            self.setRepeatAction(QSlider.SliderNoAction)  # why again?
-            self._clickOffset = self._pixelPosToRangeValue(self._pick(ev.pos()))
+    def _updatePressedControl(self, pos):
+        opt = self._getStyleOption()
+        self._pressedControl, self._pressedIndex = self._getControlAtPos(pos, opt, True)
+
+    def _setClickOffset(self, pos):
+        if self._pressedControl == SC_BAR:
+            self._clickOffset = self._pixelPosToRangeValue(self._pick(pos))
             self._sldPosAtPress = tuple(self._position)
-            self.update()
-            self.setSliderDown(True)
+        elif self._pressedControl == SC_HANDLE:
+            hr = self._handleRects(handle_index=self._pressedIndex)
+            self._clickOffset = self._pick(pos - hr.topLeft())
 
     def mouseMoveEvent(self, ev: QtGui.QMouseEvent) -> None:
-        # TODO: add pixelMetric(QStyle::PM_MaximumDragDistance, &opt, this);
-        if self._pressedControl[0] == "handle":
+        if self._pressedControl == SC_BAR:
             ev.accept()
-            new = self._pixelPosToRangeValue(self._pick(ev.pos()) - self._clickOffset)
-            self._setSliderPositionAt(self._pressedControl[1], new)
-        elif self._pressedControl[0] == "bar":
-            ev.accept()
-
             delta = self._clickOffset - self._pixelPosToRangeValue(self._pick(ev.pos()))
             self._offsetAllPositions(-delta, self._sldPosAtPress)
         else:
-            ev.ignore()
-            return
-
-    def mouseReleaseEvent(self, ev: QtGui.QMouseEvent) -> None:
-        if self._pressedControl[0] == "None" or ev.buttons():
-            ev.ignore()
-            return
-        ev.accept()
-        old_pressed = self._pressedControl
-        self._pressedControl = self._NULL_CTRL
-        self.setRepeatAction(QSlider.SliderNoAction)
-        if old_pressed[0] in ("handle", "bar"):
-            self.setSliderDown(False)
-        self.update()  # TODO: restrict to the rect of old_pressed
-
-    def triggerAction(self, action: QSlider.SliderAction) -> None:
-        super().triggerAction(action)  # TODO: probably need to override.
-        self.setValue(self._position)
-
-    def setRange(self, min: int, max: int) -> None:
-        super().setRange(min, max)
-        self.setValue(self._value)  # re-bound
+            super().mouseMoveEvent(ev)
 
     def _handleRects(
         self, opt: QStyleOptionSlider = None, handle_index: int = None
@@ -377,24 +324,20 @@ class QRangeSlider(_GenericSlider):
         style = self.style().proxy()
 
         if handle_index is not None:  # get specific handle rect
-            opt.sliderPosition = self._position[handle_index]
-            return style.subControlRect(
-                QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self
-            )
+            opt.sliderPosition = int(self._position[handle_index])
+            return style.subControlRect(CC_SLIDER, opt, SC_HANDLE, self)
         else:
             rects = []
             for p in self._position:
-                opt.sliderPosition = p
-                r = style.subControlRect(
-                    QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self
-                )
+                opt.sliderPosition = int(p)
+                r = style.subControlRect(CC_SLIDER, opt, SC_HANDLE, self)
                 rects.append(r)
             return rects
 
     def _grooveRect(self, opt: QStyleOptionSlider) -> QRect:
         """Return the QRect for the slider groove."""
         style = self.style().proxy()
-        return style.subControlRect(QStyle.CC_Slider, opt, QStyle.SC_SliderGroove, self)
+        return style.subControlRect(CC_SLIDER, opt, SC_GROOVE, self)
 
     def _barRect(self, opt: QStyleOptionSlider, r_groove: QRect = None) -> QRect:
         """Return the QRect for the bar between the outer handles."""
@@ -419,52 +362,37 @@ class QRangeSlider(_GenericSlider):
 
         return r_bar
 
+    # TODO: this is very much tied to mousepress... not a generic "get control"
     def _getControlAtPos(
         self, pos: QPoint, opt: QStyleOptionSlider = None, closest_handle=False
-    ) -> ControlType:
+    ) -> Tuple[QStyle.SubControl, int]:
         """Update self._pressedControl based on ev.pos()."""
         if not opt:
             opt = self._getStyleOption()
 
-        event_position = self._pick(pos)
-        bar_idx = 0
-        hdl_idx = 0
-        dist = float("inf")
-
         if isinstance(pos, QPointF):
-            pos = QPoint(pos.x(), pos.y())
-        # TODO: this should be reversed, to prefer higher value handles
+            pos = pos.toPoint()
+
         for i, hdl in enumerate(self._handleRects(opt)):
             if hdl.contains(pos):
-                return ("handle", i)  # TODO: use enum for 'handle'
-            hdl_center = self._pick(hdl.center())
-            abs_dist = abs(event_position - hdl_center)
-            if abs_dist < dist:
-                dist = abs_dist
-                hdl_idx = i
-            if event_position > hdl_center:
-                bar_idx += 1
-        else:
-            if closest_handle:
-                if bar_idx == 0:
-                    # the click was below the minimum slider
-                    return ("handle", 0)
-                elif bar_idx == len(self._position):
-                    # the click was above the maximum slider
-                    return ("handle", len(self._position) - 1)
-            if self._bar_moves_all:
-                # the click was in an internal segment
-                return ("bar", bar_idx)
-            elif closest_handle:
-                return ("handle", hdl_idx)
+                return (SC_HANDLE, i)  # TODO: use enum for 'handle'
 
-        return self._NULL_CTRL
+        click_pos = self._pixelPosToRangeValue(self._pick(pos), opt)
+        for i, p in enumerate(self._position):
+            if p > click_pos:
+                if i > 0:
+                    # the click was in an internal segment
+                    if self._bar_moves_all:
+                        return (SC_BAR, i)
+                    avg = (self._position[i - 1] + self._position[i]) / 2
+                    return (SC_HANDLE, i - 1 if click_pos < avg else i)
+                # the click was below the minimum slider
+                return (SC_HANDLE, 0)
 
-    def _handle_offset(self, opt: QStyleOptionSlider) -> QPoint:
-        # to take half of the slider off for the setSliderPosition call we use the
-        # center - topLeft
-        handle_rect = self._handleRects(opt, 0)
-        return handle_rect.center() - handle_rect.topLeft()
+        # the click was above the maximum slider
+        return (SC_HANDLE, len(self._position) - 1)
+
+        # return (SC_NONE, 0) # FIXME: case of position outside of widget
 
     # from QSliderPrivate::pixelPosToRangeValue
     def _pixelPosToRangeValue(self, pos: int, opt: QStyleOptionSlider = None) -> int:
@@ -491,19 +419,6 @@ class QRangeSlider(_GenericSlider):
     def _pick(self, pt: QPoint) -> int:
         return pt.x() if self.orientation() == Qt.Horizontal else pt.y()
 
-    def _min_max_bound(self, val: int) -> int:
-        return _bound(self.minimum(), self.maximum(), val)
-
-    def _neighbor_bound(self, val: int, index: int, _lst: List[int]) -> int:
-        # make sure we don't go lower than any preceding index:
-        min_dist = self.singleStep()
-        if index > 0:
-            val = max(_lst[index - 1] + min_dist, val)
-        # make sure we don't go higher than any following index:
-        if index < (len(_lst) - 1):
-            val = min(_lst[index + 1] - min_dist, val)
-        return val
-
     def wheelEvent(self, e: QtGui.QWheelEvent) -> None:
         e.ignore()
         vertical = bool(e.angleDelta().y())
@@ -516,7 +431,7 @@ class QRangeSlider(_GenericSlider):
             e.accept()
 
     def _scrollByDelta(self, orientation, modifiers, delta: int) -> bool:
-        steps_to_scroll = 0
+        steps_to_scroll = 0.0
         pg_step = self.pageStep()
 
         # in Qt scrolling to the right gives negative values.
@@ -525,7 +440,7 @@ class QRangeSlider(_GenericSlider):
         offset = delta / 120
         if modifiers & Qt.ShiftModifier:
             # Scroll one page regardless of delta:
-            steps_to_scroll = _bound(-pg_step, pg_step, int(offset * pg_step))
+            steps_to_scroll = max(-pg_step, min(pg_step, int(offset * pg_step)))
             self._offset_accum = 0
         elif modifiers & Qt.ControlModifier:
             # Scroll one page regardless of delta:
@@ -547,7 +462,7 @@ class QRangeSlider(_GenericSlider):
             self._offset_accum += steps_to_scrollF
 
             # Don't scroll more than one page in any case:
-            steps_to_scroll = _bound(-pg_step, pg_step, int(self._offset_accum))
+            steps_to_scroll = max(-pg_step, min(pg_step, int(self._offset_accum)))
 
             self._offset_accum -= int(self._offset_accum)
 
@@ -585,11 +500,6 @@ class QRangeSlider(_GenericSlider):
 
     def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
         return  # TODO
-
-
-def _bound(min_: int, max_: int, value: int) -> int:
-    """Return value bounded by min_ and max_."""
-    return max(min_, min(max_, value))
 
 
 QRangeSlider.__doc__ += "\n" + textwrap.indent(QSlider.__doc__, "    ")
