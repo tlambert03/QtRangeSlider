@@ -48,7 +48,7 @@ def test_drag_handles(qtbot):
     rs.show()
 
     # press the left handle
-    opt = rs._getStyleOption()
+    opt = rs._styleOption
     pos = rs._handleRects(opt, 0).center()
     with qtbot.waitSignal(rs.sliderPressed):
         qtbot.mousePress(rs, Qt.LeftButton, pos=pos)
@@ -96,7 +96,7 @@ def test_drag_handles_beyond_edge(qtbot):
     rs.show()
 
     # press the right handle
-    opt = rs._getStyleOption()
+    opt = rs._styleOption
     pos = rs._handleRects(opt, 1).center()
     with qtbot.waitSignal(rs.sliderPressed):
         qtbot.mousePress(rs, Qt.LeftButton, pos=pos)
