@@ -1,11 +1,21 @@
-# QtRangeSlider
 
-[![License](https://img.shields.io/pypi/l/QtRangeSlider.svg?color=green)](https://github.com/tlambert03/QtRangeSlider/raw/master/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/QtRangeSlider.svg?color=green)](https://pypi.org/project/QtRangeSlider)
-[![Python
-Version](https://img.shields.io/pypi/pyversions/QtRangeSlider.svg?color=green)](https://python.org)
-[![Test](https://github.com/tlambert03/QtRangeSlider/actions/workflows/test_and_deploy.yml/badge.svg)](https://github.com/tlambert03/QtRangeSlider/actions/workflows/test_and_deploy.yml)
-[![codecov](https://codecov.io/gh/tlambert03/QtRangeSlider/branch/master/graph/badge.svg)](https://codecov.io/gh/tlambert03/QtRangeSlider)
+# 🔒 archived 🔒 
+
+The content of this package has moved to [`superqt`](https://github.com/napari/superqt).
+
+```sh
+pip install superqt
+```
+
+The last version of qtrangeslider (v0.1.5) will remain on pypi, but you are encouraged
+to use superqt instead.
+
+```python
+# now use:
+from superqt import QRangeSlider, QLabeledSlider  # etc...
+```
+
+## QtRangeSlider (archived)
 
 **The missing multi-handle range slider widget for PyQt & PySide**
 
@@ -23,19 +33,6 @@ default, and the slider should behave like a standard
 - Supports mouse wheel and keypress (soon) events
 - Supports PyQt5, PyQt6, PySide2 and PySide6
 - Supports more than 2 handles (e.g. `slider.setValue([0, 10, 60, 80])`)
-
-## Installation
-
-You can install `QtRangeSlider` via pip:
-
-```sh
-pip install qtrangeslider
-
-# NOTE: you must also install a Qt Backend.
-# PyQt5, PySide2, PyQt6, and PySide6 are supported
-# As a convenience you can install them as extras:
-pip install qtrangeslider[pyqt5]
-```
 
 
 ------
